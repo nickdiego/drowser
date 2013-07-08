@@ -28,7 +28,8 @@ Data PlatformClient::loadResource(const char* name)
     return AudioFileReader::loadResource(name);
 }
 
-AudioDevice* PlatformClient::createAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* renderCallback)
+AudioDevice* PlatformClient::createAudioDevice(const Nix::String& inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* renderCallback)
 {
-    return new GstAudioDevice(bufferSize, numberOfInputChannels, numberOfChannels, sampleRate, renderCallback);
+    printf("[%s] {%s}\n", __PRETTY_FUNCTION__, inputDeviceId.utf8().data());
+    return new GstAudioDevice(inputDeviceId, bufferSize, numberOfInputChannels, numberOfChannels, sampleRate, renderCallback);
 }
