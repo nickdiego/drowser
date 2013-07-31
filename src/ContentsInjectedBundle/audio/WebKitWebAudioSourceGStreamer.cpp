@@ -1,4 +1,5 @@
 /*
+ *  Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *  Copyright (C) 2011 Igalia S.L
  *
  *  This library is free software; you can redistribute it and/or
@@ -17,6 +18,7 @@
  */
 
 #include "WebKitWebAudioSourceGStreamer.h"
+#include "AudioLiveInputPipeline.h"
 
 #include <cstdlib>
 #include <gst/pbutils/pbutils.h>
@@ -40,6 +42,7 @@ struct _WebKitWebAudioSourcePrivate {
     gfloat sampleRate;
     Nix::AudioDevice::RenderCallback* handler;
     guint framesToPull;
+    AudioLiveInputPipeline* inputPipeline;
 
     GstElement* interleave;
     GstElement* wavEncoder;
@@ -70,6 +73,8 @@ static void webKitWebAudioSrcSetProperty(GObject*, guint propertyId, const GValu
 static void webKitWebAudioSrcGetProperty(GObject*, guint propertyId, GValue*, GParamSpec*);
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement*, GstStateChange);
 static void webKitWebAudioSrcLoop(WebKitWebAudioSrc*);
+static gboolean  webKitWebAudioSrcQuery(GstPad *pad,/* GstObject *parent,*/ GstQuery *query);
+
 
 static GstCaps* getGStreamerMonoAudioCaps(float sampleRate)
 {
@@ -190,6 +195,7 @@ static void webkit_web_audio_src_init(WebKitWebAudioSrc* src)
     new (priv) WebKitWebAudioSourcePrivate();
 
     priv->sourcePad = webkitGstGhostPadFromStaticTemplate(&srcTemplate, "src", 0);
+    gst_pad_set_query_function(priv->sourcePad, webKitWebAudioSrcQuery);
     gst_element_add_pad(GST_ELEMENT(src), priv->sourcePad);
 
     priv->handler = 0;
@@ -204,6 +210,7 @@ static void webKitWebAudioSrcConstructed(GObject* object)
     WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(object);
     WebKitWebAudioSourcePrivate* priv = src->priv;
 
+    priv->inputPipeline = new AudioLiveInputPipeline(priv->sampleRate);
     priv->interleave = gst_element_factory_make("interleave", 0);
     priv->wavEncoder = gst_element_factory_make("wavenc", 0);
 
@@ -260,6 +267,8 @@ static void webKitWebAudioSrcFinalize(GObject* object)
     WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(object);
     WebKitWebAudioSourcePrivate* priv = src->priv;
 
+    delete priv->inputPipeline;
+
     g_rec_mutex_clear(&priv->mutex);
     g_slist_free_full(priv->pads, reinterpret_cast<GDestroyNotify>(gst_object_unref));
 
@@ -309,38 +318,71 @@ static void webKitWebAudioSrcGetProperty(GObject* object, guint propertyId, GVal
     }
 }
 
+static inline float* mapBuffer(GstBuffer* buffer) {
+    float * ret = 0;
+    GstMapInfo info;
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+    ret = reinterpret_cast<float*>(info.data);
+    gst_buffer_unmap(buffer, &info);
+    return ret;
+}
+
 static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
 {
     WebKitWebAudioSourcePrivate* priv = src->priv;
+    //GST_WARNING_OBJECT(src, "Loop");
 
     if (!priv->handler) {
         GST_WARNING_OBJECT(src, "No handler, ignoring.");
         return;
     }
-    GSList* channelBufferList = 0;
-    unsigned bufferSize = priv->framesToPull * sizeof(float);
-    float** audioData = (float**) malloc(g_slist_length(priv->pads) * sizeof(float*));
-    for (int i = g_slist_length(priv->pads) - 1; i >= 0; i--) {
-        GstBuffer* channelBuffer = gst_buffer_new_and_alloc(bufferSize);
-        channelBufferList = g_slist_prepend(channelBufferList, channelBuffer);
-        GstMapInfo info;
-        gst_buffer_map(channelBuffer, &info, GST_MAP_READ);
-        audioData[i] = reinterpret_cast<float*>(info.data);
-        gst_buffer_unmap(channelBuffer, &info);
+    if (!priv->inputPipeline->isReady()) {
+        GST_WARNING_OBJECT(src, "Live-input not yet ready!");
+        return;
     }
 
-    // FIXME: store audioData into priv???
-    //const WebVector<float*>& sourceData, const WebVector<float*>& destinationData, size_t numberOfFrames) { };
-    // FIXME: Add support for local/live audio input by passing sourceAudioData.
-    std::vector<float*> sourceDataVector;
-    std::vector<float*> audioDataVector(2);
+    int i;
+    int numberOfChannels = g_slist_length(priv->pads);
+    float** sourceData = NULL;
+    GSList* inputBufferList = 0;
+    Nix::Vector<float*> audioDataVector((size_t) 2);
+    Nix::Vector<float*> sourceDataVector((size_t) 2);
+
+    // collect input data
+    int inputChannels = priv->inputPipeline->pullChannelBuffers(&inputBufferList);
+    if (inputChannels != 2) { // FIXME handle non-stereo input
+        GST_WARNING("Unable to handle non-stereo audio live-input");
+        return;
+    }
+
+    sourceData = (float**) malloc(numberOfChannels * sizeof(float*));
+    GSList* inbufIt = inputBufferList;
+    GstBuffer* inbuf;
+
+    for(i = 0; inbufIt != NULL; ++i, inbufIt = g_slist_next(inbufIt)) {
+        inbuf = static_cast<GstBuffer*>(inbufIt->data);
+        sourceData[i] = mapBuffer(inbuf);
+    }
+    sourceDataVector[0] = sourceData[0];
+    sourceDataVector[1] = sourceData[1];
+
+    unsigned bufferSize = priv->framesToPull * sizeof(float);
+    GSList* channelBufferList = 0;
+    GstBuffer* channelBuffer;
+    float** audioData = (float**) malloc(numberOfChannels * sizeof(float*));
+    for (i = numberOfChannels - 1; i >= 0; i--) {
+        channelBuffer = gst_buffer_new_and_alloc(bufferSize);
+        channelBufferList = g_slist_prepend(channelBufferList, channelBuffer);
+        audioData[i] = mapBuffer(channelBuffer);
+    }
+
     audioDataVector[0] = audioData[0];
     audioDataVector[1] = audioData[1];
     priv->handler->render(sourceDataVector, audioDataVector, priv->framesToPull);
 
-    for (int i = g_slist_length(priv->pads) - 1; i >= 0; i--) {
+    for (i = numberOfChannels - 1; i >= 0; i--) {
         GstPad* pad = static_cast<GstPad*>(g_slist_nth_data(priv->pads, i));
-        GstBuffer* channelBuffer = static_cast<GstBuffer*>(g_slist_nth_data(channelBufferList, i));
+        channelBuffer = static_cast<GstBuffer*>(g_slist_nth_data(channelBufferList, i));
 
         GstFlowReturn ret = gst_pad_chain(pad, channelBuffer);
         if (ret != GST_FLOW_OK)
@@ -348,6 +390,8 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
     }
 
     g_slist_free(channelBufferList);
+    if (inputBufferList)
+        g_slist_free(inputBufferList);
 }
 
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, GstStateChange transition)
@@ -379,10 +423,17 @@ static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, Gs
     }
 
     switch (transition) {
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
-        GST_DEBUG_OBJECT(src, "READY->PAUSED");
+    case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
+        GST_DEBUG_OBJECT(src, "PAUSED->PLAYING");
         if (!gst_task_start(src->priv->task))
             returnValue = GST_STATE_CHANGE_FAILURE;
+        break;
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+        // FIXME: Working always as a live-source
+        // figure out any way to make this src act
+        // as both, live and non-live source
+        GST_DEBUG_OBJECT(src, "READY->PAUSED");
+        returnValue = GST_STATE_CHANGE_NO_PREROLL;
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
         GST_DEBUG_OBJECT(src, "PAUSED->READY");
@@ -395,3 +446,22 @@ static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, Gs
 
     return returnValue;
 }
+
+static gboolean webKitWebAudioSrcQuery(GstPad *pad, GstQuery *query)
+{
+  WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(gst_pad_get_parent(pad));
+  gboolean ret;
+
+    switch (GST_QUERY_TYPE (query)) {
+      case GST_QUERY_LATENCY:
+        GST_DEBUG_OBJECT(src, "Processing latency query");
+        ret = src->priv->inputPipeline->sendQuery(query);
+        break;
+      default:
+        GST_DEBUG_OBJECT(src, "Processing query");
+        ret = gst_pad_query_default (pad, query);
+        break;
+    }
+    return ret;
+}
+
