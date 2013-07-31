@@ -20,6 +20,7 @@ private:
     bool m_wavParserAvailable;
     bool m_audioSinkAvailable;
     GstElement* m_pipeline;
+    GstElement* m_audioSink;
     double m_sampleRate;
 };
 

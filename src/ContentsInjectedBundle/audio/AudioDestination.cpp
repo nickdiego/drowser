@@ -24,6 +24,8 @@
 
 using namespace Nix;
 
+static bool configureSinkDevice(GstElement* autoSink);
+
 #ifndef GST_API_VERSION_1
 static void onGStreamerWavparsePadAddedCallback(GstElement* element, GstPad* pad, AudioDestination* destination)
 {
@@ -38,6 +40,7 @@ AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChan
     , m_sampleRate(sampleRate)
 {
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
+
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
@@ -49,15 +52,19 @@ AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChan
 
     m_wavParserAvailable = wavParser;
 
-    //ASSERT_WITH_MESSAGE(m_wavParserAvailable, "Failed to create GStreamer wavparse element");
-    if (!m_wavParserAvailable)
+    if (!m_wavParserAvailable) {
+        g_error("Failed to create GStreamer wavparse element");
         return;
+    }
 
 #ifndef GST_API_VERSION_1
     g_signal_connect(wavParser, "pad-added", G_CALLBACK(onGStreamerWavparsePadAddedCallback), this);
 #endif
     gst_bin_add_many(GST_BIN(m_pipeline), webkitAudioSrc, wavParser, NULL);
     gst_element_link_pads_full(webkitAudioSrc, "src", wavParser, "sink", GST_PAD_LINK_CHECK_NOTHING);
+
+    gst_element_sync_state_with_parent(webkitAudioSrc);
+    gst_element_sync_state_with_parent(wavParser);
 
 #ifdef GST_API_VERSION_1
     GstPad* srcPad = gst_element_get_static_pad(wavParser, "src");
@@ -73,12 +80,14 @@ AudioDestination::~AudioDestination()
 
 void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 {
-    //FIXME: POSSIBLE LEAK!!!
     GstElement* audioSink = gst_element_factory_make("autoaudiosink", 0);
     m_audioSinkAvailable = audioSink;
 
     if (!audioSink)
         return;
+
+    if (!configureSinkDevice(audioSink))
+        GST_WARNING_OBJECT(audioSink, "Couldn't configure sink device");
 
     // Autoaudiosink does the real sink detection in the GST_STATE_NULL->READY transition
     // so it's best to roll it to READY as soon as possible to ensure the underlying platform
@@ -100,11 +109,12 @@ void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
     // Link audioconvert to audiosink and roll states.
     gst_element_link_pads_full(audioConvert, "src", audioSink, "sink", GST_PAD_LINK_CHECK_NOTHING);
     gst_element_sync_state_with_parent(audioConvert);
-    gst_element_sync_state_with_parent(audioSink); //FIXME: I believe we should delete audioSink after this.
+    gst_element_sync_state_with_parent(audioSink);
 }
 
 void AudioDestination::start()
 {
+    GST_WARNING("Input Ready, starting main pipeline...");
     if (!m_wavParserAvailable)
         return;
 
@@ -118,3 +128,32 @@ void AudioDestination::stop()
 
     gst_element_set_state(m_pipeline, GST_STATE_PAUSED);
 }
+
+static bool configureSinkDevice(GstElement* autoSink) {
+    GstElement* deviceElement;
+
+    GstChildProxy* childProxy = GST_CHILD_PROXY(autoSink);
+    if (!childProxy)
+        return false;
+
+    GstStateChangeReturn stateChangeResult = gst_element_set_state(autoSink, GST_STATE_READY);
+    if (stateChangeResult != GST_STATE_CHANGE_SUCCESS)
+        return false;
+
+    if (gst_child_proxy_get_children_count(childProxy))
+        deviceElement = GST_ELEMENT(gst_child_proxy_get_child_by_index(childProxy, 0));
+
+//#if 0
+    // FIXME temp workaround for pulsesink underflow warning issues
+    // probably something related to LATENCY event failing in "play"
+    // pipeline on startup. This adds some latency to the audio rendering
+    g_object_set(deviceElement, "buffer-time", (gint64)100000, NULL);
+    g_object_set(deviceElement, "latency-time", (gint64)100000, NULL);
+    g_object_set(deviceElement, "drift-tolerance", (gint64)1000000, NULL);
+//#endif
+
+    GST_WARNING_OBJECT(deviceElement, "configured.");
+    gst_object_unref(GST_OBJECT(deviceElement));
+    return true;
+}
+

@@ -42,6 +42,7 @@ set(audio_SOURCES
   FFTGStreamer.cpp
   PlatformClientAudio.cpp
   WebKitWebAudioSourceGStreamer.cpp
+  AudioLiveInputPipeline.cpp
 )
 
 set(audio_LIBRARIES
