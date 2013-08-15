@@ -24,6 +24,7 @@
 
 using namespace Nix;
 
+static gboolean messageCallback(GstBus*, GstMessage* message, GstElement*);
 static bool configureSinkDevice(GstElement* autoSink);
 
 #ifndef GST_API_VERSION_1
@@ -42,6 +43,11 @@ AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChan
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
 
     m_pipeline = gst_pipeline_new("play");
+
+    GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
+    assert(bus);
+    gst_bus_add_signal_watch(bus);
+    g_signal_connect(bus, "message", G_CALLBACK(messageCallback), m_pipeline);
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
                                                                             "rate", sampleRate,
@@ -156,4 +162,52 @@ static bool configureSinkDevice(GstElement* autoSink) {
     gst_object_unref(GST_OBJECT(deviceElement));
     return true;
 }
+
+static gboolean messageCallback(GstBus*, GstMessage* message, GstElement* data)
+{
+    GError* error = 0;
+    gchar* debug = 0;
+
+    switch (GST_MESSAGE_TYPE(message)) {
+    case GST_MESSAGE_EOS:
+        break;
+    case GST_MESSAGE_WARNING:
+        gst_message_parse_warning(message, &error, &debug);
+        g_warning("Warning: %d, %s. Debug output: %s", error->code,  error->message, debug);
+        break;
+    case GST_MESSAGE_ERROR:
+        gst_message_parse_error(message, &error, &debug);
+        g_warning("Error: %d, %s. Debug output: %s", error->code,  error->message, debug);
+        break;
+    case GST_MESSAGE_STATE_CHANGED:
+        GstState old_state, new_state;
+        gst_message_parse_state_changed (message, &old_state, &new_state, NULL);
+        g_warning ("[play] Element %s changed state from %s to %s.\n",
+           GST_OBJECT_NAME (message->src),
+           gst_element_state_get_name (old_state),
+           gst_element_state_get_name (new_state));
+        break;
+    case GST_MESSAGE_STREAM_STATUS:
+        GstStreamStatusType status;
+        GstElement *owner;
+        gst_message_parse_stream_status(message, &status, &owner);
+        g_warning ("[play] Element %s(%s) changed stream status to %d.\n",
+           GST_OBJECT_NAME (owner),
+           GST_OBJECT_NAME (message->src), status);
+        break;
+
+    case GST_MESSAGE_LATENCY:
+        g_warning ("[play] Element %s requested latency, recaltulating...\n",
+           GST_OBJECT_NAME (message->src));
+        gst_bin_recalculate_latency(GST_BIN(data));
+        break;
+
+    default:
+        break;
+    }
+
+    //FIXME deref error and debug
+    return TRUE;
+}
+
 

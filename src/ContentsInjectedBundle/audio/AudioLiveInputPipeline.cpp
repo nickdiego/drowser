@@ -23,6 +23,9 @@
 
 #include "AudioLiveInputPipeline.h"
 
+#define AUDIO_ENABLE_PIPELINE_MSG_DUMP
+//#define AUDIO_FAKE_INPUT
+
 GstCaps* getGstAudioCaps(int, float);
 static void onGStreamerDeinterleavePadAddedCallback(GstElement*, GstPad*, AudioLiveInputPipeline*);
 static void onGStreamerDeinterleaveReadyCallback(GstElement*, AudioLiveInputPipeline*);
@@ -176,12 +179,20 @@ GstStateChangeReturn AudioLiveInputPipeline::start()
 }
 
 //#define AUDIO_FAKE_INPUT
+
 void AudioLiveInputPipeline::buildInputPipeline()
 {
     // Sub pipeline looks like:
     // ... autoaudiosrc ! audioconvert ! capsfilter ! deinterleave.
     g_print("*** configuring audio input...");
     m_pipeline = gst_pipeline_new("live-input");
+
+#ifdef AUDIO_ENABLE_PIPELINE_MSG_DUMP
+    GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
+    assert(bus);
+    gst_bus_add_signal_watch(bus);
+    g_signal_connect(bus, "message", G_CALLBACK(messageCallback), m_pipeline);
+#endif
 
 #ifndef AUDIO_FAKE_INPUT
     // FIXME: Use autoaudiosrc instead of pulsesrc and set properties using
@@ -197,10 +208,10 @@ void AudioLiveInputPipeline::buildInputPipeline()
     g_object_set(source, "buffer-time", (gint64) 1451, NULL);
     g_object_set(source, "latency-time", (guint64) 1451, NULL);
 #endif
-
     m_source = source;
 
     GstElement* audioConvert  = gst_element_factory_make("audioconvert", 0);
+
     GstElement* capsFilter = gst_element_factory_make("capsfilter", 0);
     m_deInterleave = gst_element_factory_make("deinterleave", "deinterleave");
 
@@ -250,3 +261,52 @@ static void onGStreamerDeinterleaveReadyCallback(GstElement*, AudioLiveInputPipe
 {
     reader->deinterleavePadsConfigured();
 }
+
+#ifdef AUDIO_ENABLE_PIPELINE_MSG_DUMP
+static gboolean messageCallback(GstBus*, GstMessage* message, GstElement* data)
+{
+    GError* error = 0;
+    gchar* debug = 0;
+
+    switch (GST_MESSAGE_TYPE(message)) {
+    case GST_MESSAGE_EOS:
+        break;
+    case GST_MESSAGE_WARNING:
+        gst_message_parse_warning(message, &error, &debug);
+        g_warning("Warning: %d, %s. Debug output: %s", error->code,  error->message, debug);
+        break;
+    case GST_MESSAGE_ERROR:
+        gst_message_parse_error(message, &error, &debug);
+        g_warning("Error: %d, %s. Debug output: %s", error->code,  error->message, debug);
+        break;
+    case GST_MESSAGE_STATE_CHANGED:
+        GstState old_state, new_state;
+        gst_message_parse_state_changed (message, &old_state, &new_state, NULL);
+        g_warning ("[input] Element %s changed state from %s to %s.\n",
+           GST_OBJECT_NAME (message->src),
+           gst_element_state_get_name (old_state),
+           gst_element_state_get_name (new_state));
+        break;
+    case GST_MESSAGE_STREAM_STATUS:
+        GstStreamStatusType status;
+        GstElement *owner;
+        gst_message_parse_stream_status(message, &status, &owner);
+        g_warning ("[input] Element %s(%s) changed stream status to %d.\n",
+           GST_OBJECT_NAME (owner),
+           GST_OBJECT_NAME (message->src), status);
+        break;
+
+    case GST_MESSAGE_LATENCY:
+        g_warning ("[input] Element %s requested latency, recaltulating...\n",
+           GST_OBJECT_NAME (message->src));
+        gst_bin_recalculate_latency(GST_BIN(data));
+        break;
+
+    default:
+        break;
+    }
+
+    //FIXME deref error and debug
+    return TRUE;
+}
+#endif

@@ -356,6 +356,16 @@ static void webKitWebAudioSrcGetProperty(GObject* object, guint propertyId, GVal
     }
 }
 
+//#define _ENABLE_WEBAUDIO_ROUTING 0
+#define DUMP_BUFFER(buff, label, num) {         \
+    fprintf(stdout, "%s -- { ", label);         \
+    /*for(register int i = 0; i < num; ++i) {*/ \
+    for(register int i = 0; i < 12; ++i) {      \
+        fprintf(stdout, "%f, ", buff[i]);       \
+    }                                           \
+    fprintf(stdout, "... }\n");                 \
+}
+
 static inline float* mapBuffer(GstBuffer* buffer) {
     float * ret = 0;
 #ifdef GST_API_VERSION_1
@@ -368,6 +378,9 @@ static inline float* mapBuffer(GstBuffer* buffer) {
 #endif
     return ret;
 }
+
+#define AUDIO_ENABLE_LIVE_INPUT
+//#define AUDIO_BYPASS_WEBKIT // bypass webkit
 
 static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
 {
@@ -388,6 +401,10 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
     float** sourceData = NULL;
     GSList* inputBufferList = 0;
     Nix::Vector<float*> audioDataVector((size_t) 2);
+
+#ifdef AUDIO_ENABLE_LIVE_INPUT
+    //GstClockTime ini, end;
+    //ini = gst_clock_get_time(GST_ELEMENT_GET_CLOCK(src));
     Nix::Vector<float*> sourceDataVector((size_t) 2);
 
     // collect input data
@@ -404,9 +421,32 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
     for(i = 0; inbufIt != NULL; ++i, inbufIt = g_slist_next(inbufIt)) {
         inbuf = static_cast<GstBuffer*>(inbufIt->data);
         sourceData[i] = mapBuffer(inbuf);
+
+#ifdef AUDIO_BYPASS_WEBKIT
+        // Forcing chaining the buffer bypassing webkit processing
+        // to achieve that, also uncomment #if 0/#endif bellow...
+        GstPad* pad = static_cast<GstPad*>(g_slist_nth_data(priv->pads, i));
+        GstFlowReturn ret = gst_pad_chain(pad, inbuf);
+        if (ret != GST_FLOW_OK) {
+            GST_ELEMENT_ERROR(src, CORE, PAD, ("Internal WebAudioSrc error"), ("Failed to push buffer on %s", GST_DEBUG_PAD_NAME(pad)));
+        }
+    }
+    if (inputBufferList)
+        g_slist_free(inputBufferList);
+    return;
+
+#else
     }
     sourceDataVector[0] = sourceData[0];
     sourceDataVector[1] = sourceData[1];
+
+    //end = gst_clock_get_time(GST_ELEMENT_GET_CLOCK(src));
+    //GST_WARNING_OBJECT(src, "got input buffers - time: %ld nanosecs\n", (end-ini));
+#endif // bypass webkit
+
+#else
+    Nix::Vector<float*> sourceDataVector;
+#endif // enable live-input
 
     unsigned bufferSize = priv->framesToPull * sizeof(float);
     GSList* channelBufferList = 0;
