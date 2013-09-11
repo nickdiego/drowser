@@ -19,8 +19,12 @@
 #include "AudioDestination.h"
 #include "WebKitWebAudioSourceGStreamer.h"
 
+#include <NixPlatform/CString.h>
+#include <NixPlatform/String.h>
+#include <NixPlatform/Vector.h>
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
+#include <cstring>
 
 using namespace Nix;
 
@@ -33,19 +37,29 @@ static void onGStreamerWavparsePadAddedCallback(GstElement* element, GstPad* pad
 }
 #endif
 
-AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* callback)
+AudioDestination::AudioDestination(const Nix::String& inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
     : m_wavParserAvailable(false)
     , m_audioSinkAvailable(false)
     , m_pipeline(0)
     , m_sampleRate(sampleRate)
+    , m_bufferSize(bufferSize)
+    , m_isDevice(false)
+    , m_loopId(0)
+    , m_inputDeviceId(inputDeviceId)
+    , m_renderCallback(renderCallback)
 {
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
+
+    if (!std::strcmp(m_inputDeviceId.utf8().data(), "autoaudiosrc;default"))
+        m_isDevice = true;
+
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
 
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
                                                                             "rate", sampleRate,
-                                                                            "handler", callback,
+                                                                            "handler", renderCallback,
                                                                             "frames", bufferSize, NULL));
 
     GstElement* wavParser = gst_element_factory_make("wavparse", 0);
@@ -74,8 +88,10 @@ AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChan
 
 AudioDestination::~AudioDestination()
 {
+    printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
+    g_source_remove(m_loopId);
 }
 
 void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
@@ -115,6 +131,7 @@ void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 void AudioDestination::start()
 {
     GST_WARNING("Input Ready, starting main pipeline...");
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
     if (!m_wavParserAvailable)
         return;
 
@@ -156,4 +173,3 @@ static bool configureSinkDevice(GstElement* autoSink) {
     gst_object_unref(GST_OBJECT(deviceElement));
     return true;
 }
-
