@@ -59,7 +59,6 @@ AudioLiveInputPipeline::~AudioLiveInputPipeline()
     }
 }
 
-#ifndef GST_API_VERSION_1
 int AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
 {
     if (!m_ready || !m_sinkList) {
@@ -84,6 +83,46 @@ int AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
     return count;
 }
 
+#ifdef GST_API_VERSION_1
+GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
+{
+    GstSample* sample = gst_app_sink_pull_sample(sink);
+    if (!sample)
+        return 0;
+
+    GstBuffer* buffer = gst_sample_get_buffer(sample);
+    if (!buffer) {
+        gst_sample_unref(sample);
+        return 0;
+    }
+
+    GstCaps* caps = gst_sample_get_caps(sample);
+    if (!caps) {
+        gst_sample_unref(sample);
+        return 0;
+    }
+
+    GstAudioInfo info;
+    gst_audio_info_from_caps(&info, caps);
+    //int frames = GST_CLOCK_TIME_TO_FRAMES(GST_BUFFER_DURATION(buffer), GST_AUDIO_INFO_RATE(&info));
+
+    // Check the first audio channel. The buffer is supposed to store
+    // data of a single channel anyway.
+    switch (GST_AUDIO_INFO_POSITION(&info, 0)) {
+    case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
+    case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
+        break;
+    default:
+        gst_buffer_unref(buffer);
+        buffer = 0;
+        break;
+    }
+
+    gst_sample_unref(sample);
+    return buffer;
+}
+
+#else // GSTREAMER >= 1.0
 GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
 {
     GstBuffer* buffer = gst_app_sink_pull_buffer(sink);
@@ -119,11 +158,11 @@ GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
     GstAudioChannelPosition* positions = gst_audio_get_channel_positions(structure);
     switch (positions[0]) {
     case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
-        break;
     case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
         break;
     default:
         gst_buffer_unref(buffer);
+        buffer = 0;
         break;
     }
 
@@ -218,6 +257,10 @@ void AudioLiveInputPipeline::buildInputPipeline()
 
     GstPad* pad = gst_element_get_static_pad(m_deInterleave, "sink");
     gst_pad_set_caps(pad, caps);
+
+#ifdef GST_API_VERSION_1
+    m_ready = true;
+#endif
 
     gst_element_sync_state_with_parent(source);
     gst_element_sync_state_with_parent(audioConvert);
