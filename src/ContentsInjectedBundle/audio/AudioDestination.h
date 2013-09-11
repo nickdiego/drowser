@@ -6,7 +6,7 @@
 
 class AudioDestination : public Nix::AudioDevice {
 public:
-    AudioDestination(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, Nix::AudioDevice::RenderCallback* renderCallback);
+    AudioDestination(const Nix::String& inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, Nix::AudioDevice::RenderCallback* renderCallback);
     virtual ~AudioDestination();
 
     virtual void start();
@@ -22,6 +22,7 @@ private:
     GstElement* m_pipeline;
     GstElement* m_audioSink;
     double m_sampleRate;
+    const Nix::String& m_inputDeviceId;
 };
 
 #endif

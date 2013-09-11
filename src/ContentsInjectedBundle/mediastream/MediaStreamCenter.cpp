@@ -23,33 +23,47 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "UserMediaClient.h"
-#include <NixPlatform/UserMediaRequest.h>
+#include "MediaStreamCenter.h"
+#include <NixPlatform/MediaStreamCenter.h>
 
 #include <cstdio>
+#include <glib.h>
+#include <gst/gst.h>
 
-UserMediaClient::UserMediaClient()
+MediaStreamCenter::MediaStreamCenter()
 {
     printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
 }
 
-UserMediaClient::~UserMediaClient()
+MediaStreamCenter::~MediaStreamCenter()
 {
     printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
 }
 
-void UserMediaClient::pageDestroyed()
+void MediaStreamCenter::queryMediaStreamsSources(Nix::MediaStreamSourcesQueryClient& queryClient)
 {
     printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
-    delete this;
-}
+    Nix::Vector<Nix::MediaStreamSource> audioSources;
+    Nix::Vector<Nix::MediaStreamSource> videoSources;
 
-void UserMediaClient::requestUserMedia(const Nix::UserMediaRequest& request, const Nix::Vector<Nix::MediaStreamSource>& audioSources, const Nix::Vector<Nix::MediaStreamSource>& videoSources)
-{
-    printf("[%s] %p -- audio: %d, video: %d\n", __PRETTY_FUNCTION__, this, request.audio(), request.video());
-}
+    if (queryClient.audio()) {
+        GstElement* audioSrc = gst_element_factory_make("autoaudiosrc", "autosrc");
+        if (audioSrc) {
+            audioSources = Nix::Vector<Nix::MediaStreamSource>((size_t) 1);
 
-void UserMediaClient::cancelUserMediaRequest(const Nix::UserMediaRequest& request)
-{
-    printf("[%s] %p -- audio: %d, video: %d\n", __PRETTY_FUNCTION__, this, request.audio(), request.video());
+            char* deviceId = gst_element_get_name(gst_element_get_factory(audioSrc));
+            char buffer[100];
+            sprintf(buffer, "%s;default", deviceId);
+
+            printf("[%s] %p %s\n", __PRETTY_FUNCTION__, this, buffer);
+
+            audioSources[0].initialize(Nix::String("autosrc"), Nix::MediaStreamSource::TypeAudio, "default");
+            audioSources[0].setDeviceId(Nix::String("autoaudiosrc;default"));
+        }
+    }
+    
+    if (queryClient.video()) {
+        // Not supported.
+    }
+    queryClient.didCompleteQuery(audioSources, videoSources);
 }

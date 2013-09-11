@@ -19,8 +19,11 @@
 #include "AudioDestination.h"
 #include "WebKitWebAudioSourceGStreamer.h"
 
+#include <NixPlatform/CString.h>
+#include <NixPlatform/String.h>
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
+#include <cstring>
 
 using namespace Nix;
 
@@ -33,12 +36,14 @@ static void onGStreamerWavparsePadAddedCallback(GstElement* element, GstPad* pad
 }
 #endif
 
-AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* callback)
+AudioDestination::AudioDestination(const Nix::String& inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* callback)
     : m_wavParserAvailable(false)
     , m_audioSinkAvailable(false)
     , m_pipeline(0)
     , m_sampleRate(sampleRate)
+    , m_inputDeviceId(inputDeviceId)
 {
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
 
     m_pipeline = gst_pipeline_new("play");
@@ -74,6 +79,7 @@ AudioDestination::AudioDestination(size_t bufferSize, unsigned numberOfInputChan
 
 AudioDestination::~AudioDestination()
 {
+    printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
 }
@@ -114,6 +120,7 @@ void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 
 void AudioDestination::start()
 {
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
     GST_WARNING("Input Ready, starting main pipeline...");
     if (!m_wavParserAvailable)
         return;
@@ -123,6 +130,7 @@ void AudioDestination::start()
 
 void AudioDestination::stop()
 {
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
     if (!m_wavParserAvailable || !m_audioSinkAvailable)
         return;
 
