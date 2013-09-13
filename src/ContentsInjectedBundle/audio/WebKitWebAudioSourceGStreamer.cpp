@@ -21,6 +21,8 @@
 #include "AudioLiveInputPipeline.h"
 
 #include <cstdlib>
+#include <vector>
+
 #include <gst/pbutils/pbutils.h>
 #include <gst/audio/audio.h>
 #include <NixPlatform/Platform.h>
@@ -73,8 +75,7 @@ static void webKitWebAudioSrcSetProperty(GObject*, guint propertyId, const GValu
 static void webKitWebAudioSrcGetProperty(GObject*, guint propertyId, GValue*, GParamSpec*);
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement*, GstStateChange);
 static void webKitWebAudioSrcLoop(WebKitWebAudioSrc*);
-static gboolean  webKitWebAudioSrcQuery(GstPad *pad,/* GstObject *parent,*/ GstQuery *query);
-
+static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstObject* parent, GstQuery* query);
 
 static GstCaps* getGStreamerMonoAudioCaps(float sampleRate)
 {
@@ -345,8 +346,8 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
     int numberOfChannels = g_slist_length(priv->pads);
     float** sourceData = NULL;
     GSList* inputBufferList = 0;
-    Nix::Vector<float*> audioDataVector((size_t) 2);
-    Nix::Vector<float*> sourceDataVector((size_t) 2);
+    std::vector<float*> audioDataVector((size_t) 2);
+    std::vector<float*> sourceDataVector((size_t) 2);
 
     // collect input data
     int inputChannels = priv->inputPipeline->pullChannelBuffers(&inputBufferList);
@@ -391,7 +392,7 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
 
     g_slist_free(channelBufferList);
     if (inputBufferList)
-        g_slist_free(inputBufferList);
+        g_slist_free_full(inputBufferList, reinterpret_cast<GDestroyNotify>(gst_buffer_unref));
 }
 
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, GstStateChange transition)
@@ -447,9 +448,9 @@ static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, Gs
     return returnValue;
 }
 
-static gboolean webKitWebAudioSrcQuery(GstPad *pad, GstQuery *query)
+static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstObject* parent, GstQuery* query)
 {
-  WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(gst_pad_get_parent(pad));
+  WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(parent);
   gboolean ret;
 
     switch (GST_QUERY_TYPE (query)) {
@@ -459,9 +460,8 @@ static gboolean webKitWebAudioSrcQuery(GstPad *pad, GstQuery *query)
         break;
       default:
         GST_DEBUG_OBJECT(src, "Processing query");
-        ret = gst_pad_query_default (pad, query);
+        ret = gst_pad_query_default (pad, parent, query);
         break;
     }
     return ret;
 }
-

@@ -27,13 +27,14 @@
 #define UserMediaClient_h
 
 #include <NixPlatform/UserMediaClient.h>
+#include <vector>
 
 class UserMediaClient : public Nix::UserMediaClient {
 public:
     UserMediaClient();
 	virtual ~UserMediaClient();
     virtual void pageDestroyed();
-    virtual void requestUserMedia(Nix::UserMediaRequest&, const Nix::Vector<Nix::MediaStreamSource>&, const Nix::Vector<Nix::MediaStreamSource>&);
+    virtual void requestUserMedia(Nix::UserMediaRequest&, const std::vector<Nix::MediaStreamSource>&, const std::vector<Nix::MediaStreamSource>&);
     virtual void cancelUserMediaRequest(const Nix::UserMediaRequest&);
 };
 

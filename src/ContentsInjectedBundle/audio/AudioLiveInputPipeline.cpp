@@ -43,19 +43,19 @@ AudioLiveInputPipeline::AudioLiveInputPipeline(float sampleRate)
 
 AudioLiveInputPipeline::~AudioLiveInputPipeline()
 {
+    if (m_sinkList)
+        g_slist_free(m_sinkList);
+
+    if (m_deInterleave) {
+        g_signal_handlers_disconnect_by_func(m_deInterleave,
+            reinterpret_cast<gpointer>(onGStreamerDeinterleavePadAddedCallback), this);
+        g_signal_handlers_disconnect_by_func(m_deInterleave,
+            reinterpret_cast<gpointer>(onGStreamerDeinterleaveReadyCallback), this);
+    }
+
     if (m_pipeline) {
         gst_element_set_state(m_pipeline, GST_STATE_NULL);
         gst_object_unref(GST_OBJECT(m_pipeline));
-    }
-
-    if (m_deInterleave) {
-        g_signal_handlers_disconnect_by_func(m_deInterleave, reinterpret_cast<gpointer>(onGStreamerDeinterleavePadAddedCallback), this);
-        g_signal_handlers_disconnect_by_func(m_deInterleave, reinterpret_cast<gpointer>(onGStreamerDeinterleaveReadyCallback), this);
-        gst_object_unref(GST_OBJECT(m_deInterleave));
-    }
-
-    if (m_sinkList) {
-        g_slist_free_full(m_sinkList, reinterpret_cast<GDestroyNotify>(gst_object_unref));
     }
 }
 
@@ -83,7 +83,6 @@ int AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
     return count;
 }
 
-#ifdef GST_API_VERSION_1
 GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
 {
     GstSample* sample = gst_app_sink_pull_sample(sink);
@@ -111,9 +110,9 @@ GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
     switch (GST_AUDIO_INFO_POSITION(&info, 0)) {
     case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
     case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
+        gst_buffer_ref(buffer); // transferring ownership of buffer to the calling object
         break;
     default:
-        gst_buffer_unref(buffer);
         buffer = 0;
         break;
     }
@@ -121,56 +120,6 @@ GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
     gst_sample_unref(sample);
     return buffer;
 }
-
-#else // GSTREAMER >= 1.0
-GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
-{
-    GstBuffer* buffer = gst_app_sink_pull_buffer(sink);
-    if (!buffer)
-        return 0;
-
-    GstCaps* caps = gst_buffer_get_caps(buffer);
-    GstStructure* structure = gst_caps_get_structure(caps, 0);
-
-    gint channels = 0;
-    if (!gst_structure_get_int(structure, "channels", &channels) || !channels) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return 0;
-    }
-
-    gint sampleRate = 0;
-    if (!gst_structure_get_int(structure, "rate", &sampleRate) || !sampleRate) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return 0;
-    }
-
-    gint width = 0;
-    if (!gst_structure_get_int(structure, "width", &width) || !width) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return 0;
-    }
-
-    // Check the first audio channel. The buffer is supposed to store
-    // data of a single channel anyway.
-    GstAudioChannelPosition* positions = gst_audio_get_channel_positions(structure);
-    switch (positions[0]) {
-    case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
-    case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
-        break;
-    default:
-        gst_buffer_unref(buffer);
-        buffer = 0;
-        break;
-    }
-
-    g_free(positions);
-    gst_caps_unref(caps);
-    return buffer;
-}
-#endif
 
 gboolean AudioLiveInputPipeline::sendQuery(GstQuery* query)
 {
@@ -199,12 +148,12 @@ void AudioLiveInputPipeline::handleNewDeinterleavePad(GstPad* pad)
     gst_element_sync_state_with_parent(queue);
     gst_element_sync_state_with_parent(sink);
 
-    g_print("*** plugged a new appsink %d", g_slist_length(m_sinkList));
+    g_print("*** plugged a new appsink %d\n", g_slist_length(m_sinkList));
 }
 
 void AudioLiveInputPipeline::deinterleavePadsConfigured()
 {
-    g_print("*** input pipeline is ready");
+    g_print("*** input pipeline is ready\n");
     m_ready = true;
 }
 
@@ -219,7 +168,7 @@ void AudioLiveInputPipeline::buildInputPipeline()
 {
     // Sub pipeline looks like:
     // ... autoaudiosrc ! audioconvert ! capsfilter ! deinterleave.
-    g_print("*** configuring audio input...");
+    g_print("*** configuring audio input...\n");
     m_pipeline = gst_pipeline_new("live-input");
 
 #ifndef AUDIO_FAKE_INPUT
@@ -258,9 +207,7 @@ void AudioLiveInputPipeline::buildInputPipeline()
     GstPad* pad = gst_element_get_static_pad(m_deInterleave, "sink");
     gst_pad_set_caps(pad, caps);
 
-#ifdef GST_API_VERSION_1
     m_ready = true;
-#endif
 
     gst_element_sync_state_with_parent(source);
     gst_element_sync_state_with_parent(audioConvert);
@@ -270,18 +217,10 @@ void AudioLiveInputPipeline::buildInputPipeline()
 
 GstCaps* getGstAudioCaps(int channels, float sampleRate)
 {
-#ifdef GST_API_VERSION_1
     return gst_caps_new_simple("audio/x-raw", "rate", G_TYPE_INT, static_cast<int>(sampleRate),
         "channels", G_TYPE_INT, channels,
         "format", G_TYPE_STRING, gst_audio_format_to_string(GST_AUDIO_FORMAT_F32),
         "layout", G_TYPE_STRING, "interleaved", NULL);
-#else
-    return gst_caps_new_simple("audio/x-raw-float", "rate", G_TYPE_INT, static_cast<int>(sampleRate),
-        "channels", G_TYPE_INT, channels,
-        "endianness", G_TYPE_INT, G_BYTE_ORDER,
-        "width", G_TYPE_INT, 32,
-        "layout", G_TYPE_STRING, "interleaved", NULL);
-#endif
 }
 
 static void onGStreamerDeinterleavePadAddedCallback(GstElement*, GstPad* pad, AudioLiveInputPipeline* reader)

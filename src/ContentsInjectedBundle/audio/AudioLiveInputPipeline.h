@@ -3,13 +3,8 @@
 
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
-#include <gst/pbutils/pbutils.h>
-
-#ifdef GST_API_VERSION_1
 #include <gst/audio/audio.h>
-#else
-#include <gst/audio/multichannel.h>
-#endif
+#include <gst/pbutils/pbutils.h>
 
 class AudioLiveInputPipeline {
 public:
