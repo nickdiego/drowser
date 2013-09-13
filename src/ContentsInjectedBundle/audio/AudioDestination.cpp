@@ -19,8 +19,6 @@
 #include "AudioDestination.h"
 #include "WebKitWebAudioSourceGStreamer.h"
 
-#include <NixPlatform/CString.h>
-#include <NixPlatform/String.h>
 #include <NixPlatform/Vector.h>
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
@@ -37,7 +35,7 @@ static void onGStreamerWavparsePadAddedCallback(GstElement* element, GstPad* pad
 }
 #endif
 
-AudioDestination::AudioDestination(const Nix::String& inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
+AudioDestination::AudioDestination(const char* inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
     : m_wavParserAvailable(false)
     , m_audioSinkAvailable(false)
     , m_pipeline(0)
@@ -48,9 +46,9 @@ AudioDestination::AudioDestination(const Nix::String& inputDeviceId, size_t buff
     , m_inputDeviceId(inputDeviceId)
     , m_renderCallback(renderCallback)
 {
-    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
 
-    if (!std::strcmp(m_inputDeviceId.utf8().data(), "autoaudiosrc;default"))
+    if (!std::strcmp(m_inputDeviceId, "autoaudiosrc;default"))
         m_isDevice = true;
 
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
@@ -131,7 +129,8 @@ void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 void AudioDestination::start()
 {
     GST_WARNING("Input Ready, starting main pipeline...");
-    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId.utf8().data());
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
+
     if (!m_wavParserAvailable)
         return;
 

@@ -43,14 +43,14 @@ MediaStreamCenter::~MediaStreamCenter()
 void MediaStreamCenter::queryMediaStreamsSources(Nix::MediaStreamSourcesQueryClient& queryClient)
 {
     printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
-    Nix::Vector<Nix::MediaStreamSource> audioSources;
-    Nix::Vector<Nix::MediaStreamSource> videoSources;
+    std::vector<Nix::MediaStreamSource> audioSources;
+    std::vector<Nix::MediaStreamSource> videoSources;
 
     //*
     if (queryClient.audio()) {
         GstElement* audioSrc = gst_element_factory_make("autoaudiosrc", "autosrc");
         if (audioSrc) {
-            audioSources = Nix::Vector<Nix::MediaStreamSource>((size_t) 1);
+            audioSources = std::vector<Nix::MediaStreamSource>((size_t) 1);
 
             char* deviceId = gst_element_get_name(gst_element_get_factory(audioSrc));
             char buffer[100];
@@ -58,8 +58,8 @@ void MediaStreamCenter::queryMediaStreamsSources(Nix::MediaStreamSourcesQueryCli
 
             printf("[%s] %p %s\n", __PRETTY_FUNCTION__, this, buffer);
 
-            audioSources[0].initialize(Nix::String("autosrc"), Nix::MediaStreamSource::TypeAudio, "default");
-            audioSources[0].setDeviceId(Nix::String("autoaudiosrc;default"));
+            audioSources[0].initialize("autosrc", Nix::MediaStreamSource::TypeAudio, "default");
+            audioSources[0].setDeviceId("autoaudiosrc;default");
         }
     }
     //*/

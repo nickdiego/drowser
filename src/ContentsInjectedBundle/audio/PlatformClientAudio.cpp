@@ -3,7 +3,6 @@
 #include "AudioDestination.h"
 
 #include <NixPlatform/AudioBus.h>
-#include <NixPlatform/CString.h>
 
 #include <cstdio>
 #include <cstring>
@@ -31,8 +30,8 @@ Data PlatformClient::loadResource(const char* name)
     return AudioFileReader::loadResource(name);
 }
 
-AudioDevice* PlatformClient::createAudioDevice(const Nix::String& inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* renderCallback)
+AudioDevice* PlatformClient::createAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* renderCallback)
 {
-    printf("[%s] {%s}\n", __PRETTY_FUNCTION__, inputDeviceId.utf8().data());
+    printf("[%s] {%s}\n", __PRETTY_FUNCTION__, inputDeviceId);
     return new AudioDestination(inputDeviceId, bufferSize, numberOfInputChannels, numberOfChannels, sampleRate, renderCallback);
 }

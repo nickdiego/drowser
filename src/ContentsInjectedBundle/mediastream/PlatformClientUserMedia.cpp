@@ -2,6 +2,8 @@
 #include "MediaStreamCenter.h"
 #include "UserMediaClient.h"
 
+#include <cstdio>
+
 Nix::UserMediaClient* PlatformClient::createUserMediaClient()
 {
 	printf("[%s]\n", __PRETTY_FUNCTION__);

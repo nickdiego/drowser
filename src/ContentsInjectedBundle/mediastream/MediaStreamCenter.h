@@ -26,10 +26,8 @@
 #ifndef MediaStreamCenter_h
 #define MediaStreamCenter_h
 
-#include <NixPlatform/CString.h>
 #include <NixPlatform/MediaStreamCenter.h>
 #include <NixPlatform/MediaStreamSourcesQueryClient.h>
-#include <NixPlatform/String.h>
 
 class MediaStreamCenter : public Nix::MediaStreamCenter {
 public:

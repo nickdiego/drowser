@@ -29,8 +29,6 @@
 #include <NixPlatform/MediaStreamSource.h>
 #include <NixPlatform/MediaStreamTrack.h>
 #include <NixPlatform/UserMediaRequest.h>
-#include <NixPlatform/CString.h>
-#include <NixPlatform/String.h>
 
 #include <cstdio>
 
@@ -50,18 +48,18 @@ void UserMediaClient::pageDestroyed()
     delete this;
 }
 
-void UserMediaClient::requestUserMedia(Nix::UserMediaRequest& request, const Nix::Vector<Nix::MediaStreamSource>& audioSources, const Nix::Vector<Nix::MediaStreamSource>& videoSources)
+void UserMediaClient::requestUserMedia(Nix::UserMediaRequest& request, const std::vector<Nix::MediaStreamSource>& audioSources, const std::vector<Nix::MediaStreamSource>& videoSources)
 {
     printf("[%s] %p -- audio: %d, video: %d\n", __PRETTY_FUNCTION__, this, request.audio(), request.video());
-    Nix::Vector<Nix::MediaStreamTrack> audioTracks;
+    std::vector<Nix::MediaStreamTrack> audioTracks;
     if (request.audio()) {
-        audioTracks = Nix::Vector<Nix::MediaStreamTrack>((size_t) 1);
+        audioTracks = std::vector<Nix::MediaStreamTrack>((size_t) 1);
         Nix::MediaStreamTrack audioTrack;
         audioTrack.initialize(audioSources[0].id(), audioSources[0]);
         audioTracks[0] = audioTrack;
     }
 
-    Nix::Vector<Nix::MediaStreamTrack> videoTracks;
+    std::vector<Nix::MediaStreamTrack> videoTracks;
     if (request.video()) {
         // Not supported.
     }

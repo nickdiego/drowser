@@ -36,6 +36,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cassert>
+#include <cstdlib>
 
 using namespace Nix;
 
