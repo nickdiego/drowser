@@ -442,7 +442,7 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
 
     g_slist_free(channelBufferList);
     if (inputBufferList)
-        g_slist_free(inputBufferList);
+        g_slist_free_full(inputBufferList, reinterpret_cast<GDestroyNotify>(gst_buffer_unref));
 }
 
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, GstStateChange transition)

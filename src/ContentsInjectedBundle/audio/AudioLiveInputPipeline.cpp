@@ -111,9 +111,9 @@ GstBuffer* AudioLiveInputPipeline::pullNewBuffer(GstAppSink* sink)
     switch (GST_AUDIO_INFO_POSITION(&info, 0)) {
     case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
     case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
+        gst_buffer_ref(buffer); // transferring ownership of buffer to the calling object
         break;
     default:
-        gst_buffer_unref(buffer);
         buffer = 0;
         break;
     }
