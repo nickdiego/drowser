@@ -19,10 +19,11 @@
 #include "AudioDestination.h"
 #include "WebKitWebAudioSourceGStreamer.h"
 
-#include <NixPlatform/Vector.h>
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
+
 #include <cstring>
+#include <cstdio>
 
 using namespace Nix;
 
