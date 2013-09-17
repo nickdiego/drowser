@@ -85,8 +85,11 @@ static void webKitWebAudioSrcSetProperty(GObject*, guint propertyId, const GValu
 static void webKitWebAudioSrcGetProperty(GObject*, guint propertyId, GValue*, GParamSpec*);
 static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement*, GstStateChange);
 static void webKitWebAudioSrcLoop(WebKitWebAudioSrc*);
+#if GST_API_VERSION_1
 static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstObject* parent, GstQuery* query);
-
+#else
+static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstQuery* query);
+#endif
 
 static GstCaps* getGStreamerMonoAudioCaps(float sampleRate)
 {
@@ -498,6 +501,7 @@ static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, Gs
     return returnValue;
 }
 
+#if GST_API_VERSION_1
 static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstObject* parent, GstQuery* query)
 {
   WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(parent);
@@ -515,4 +519,22 @@ static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstObject* parent, GstQuery*
     }
     return ret;
 }
+#else
+static gboolean webKitWebAudioSrcQuery(GstPad* pad, GstQuery* query)
+{
+  WebKitWebAudioSrc* src = WEBKIT_WEB_AUDIO_SRC(gst_pad_get_parent(pad));
+  gboolean ret;
 
+    switch (GST_QUERY_TYPE (query)) {
+      case GST_QUERY_LATENCY:
+        GST_DEBUG_OBJECT(src, "Processing latency query");
+        ret = src->priv->inputPipeline->sendQuery(query);
+        break;
+      default:
+        GST_DEBUG_OBJECT(src, "Processing query");
+        ret = gst_pad_query_default (pad, query);
+        break;
+    }
+    return ret;
+}
+#endif

@@ -23,7 +23,6 @@ private:
     double m_sampleRate;
     size_t m_bufferSize;
     bool m_isDevice;
-    guint m_loopId;
     const char* m_inputDeviceId;
     Nix::AudioDevice::RenderCallback* m_renderCallback;
 };

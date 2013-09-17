@@ -46,7 +46,8 @@ void MediaStreamCenter::queryMediaStreamsSources(Nix::MediaStreamSourcesQueryCli
     std::vector<Nix::MediaStreamSource> audioSources;
     std::vector<Nix::MediaStreamSource> videoSources;
 
-    //*
+    // FIXME: MediaStreamSource's device id is still hardcoded, study how to
+    // get an actual device to work together with Nix::AudioDestination
     if (queryClient.audio()) {
         GstElement* audioSrc = gst_element_factory_make("autoaudiosrc", "autosrc");
         if (audioSrc) {
@@ -62,7 +63,6 @@ void MediaStreamCenter::queryMediaStreamsSources(Nix::MediaStreamSourcesQueryCli
             audioSources[0].setDeviceId("autoaudiosrc;default");
         }
     }
-    //*/
 
     if (queryClient.video()) {
         // Not supported.

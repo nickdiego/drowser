@@ -43,7 +43,6 @@ AudioDestination::AudioDestination(const char* inputDeviceId, size_t bufferSize,
     , m_sampleRate(sampleRate)
     , m_bufferSize(bufferSize)
     , m_isDevice(false)
-    , m_loopId(0)
     , m_inputDeviceId(inputDeviceId)
     , m_renderCallback(renderCallback)
 {
@@ -90,7 +89,6 @@ AudioDestination::~AudioDestination()
     printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
-    g_source_remove(m_loopId);
 }
 
 void AudioDestination::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)

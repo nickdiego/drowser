@@ -43,19 +43,20 @@ AudioLiveInputPipeline::AudioLiveInputPipeline(float sampleRate)
 
 AudioLiveInputPipeline::~AudioLiveInputPipeline()
 {
-    if (m_pipeline) {
-        gst_element_set_state(m_pipeline, GST_STATE_NULL);
-        gst_object_unref(GST_OBJECT(m_pipeline));
+    if (m_sinkList) {
+        g_slist_free(m_sinkList);
     }
 
     if (m_deInterleave) {
-        g_signal_handlers_disconnect_by_func(m_deInterleave, reinterpret_cast<gpointer>(onGStreamerDeinterleavePadAddedCallback), this);
-        g_signal_handlers_disconnect_by_func(m_deInterleave, reinterpret_cast<gpointer>(onGStreamerDeinterleaveReadyCallback), this);
-        gst_object_unref(GST_OBJECT(m_deInterleave));
+        g_signal_handlers_disconnect_by_func(m_deInterleave,
+            reinterpret_cast<gpointer>(onGStreamerDeinterleavePadAddedCallback), this);
+        g_signal_handlers_disconnect_by_func(m_deInterleave,
+            reinterpret_cast<gpointer>(onGStreamerDeinterleaveReadyCallback), this);
     }
 
-    if (m_sinkList) {
-        g_slist_free_full(m_sinkList, reinterpret_cast<GDestroyNotify>(gst_object_unref));
+    if (m_pipeline) {
+        gst_element_set_state(m_pipeline, GST_STATE_NULL);
+        gst_object_unref(GST_OBJECT(m_pipeline));
     }
 }
 
@@ -199,12 +200,12 @@ void AudioLiveInputPipeline::handleNewDeinterleavePad(GstPad* pad)
     gst_element_sync_state_with_parent(queue);
     gst_element_sync_state_with_parent(sink);
 
-    g_print("*** plugged a new appsink %d", g_slist_length(m_sinkList));
+    g_print("*** plugged a new appsink %d\n", g_slist_length(m_sinkList));
 }
 
 void AudioLiveInputPipeline::deinterleavePadsConfigured()
 {
-    g_print("*** input pipeline is ready");
+    g_print("*** input pipeline is ready\n");
     m_ready = true;
 }
 
@@ -219,7 +220,7 @@ void AudioLiveInputPipeline::buildInputPipeline()
 {
     // Sub pipeline looks like:
     // ... autoaudiosrc ! audioconvert ! capsfilter ! deinterleave.
-    g_print("*** configuring audio input...");
+    g_print("*** configuring audio input...\n");
     m_pipeline = gst_pipeline_new("live-input");
 
 #ifndef AUDIO_FAKE_INPUT
