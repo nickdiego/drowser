@@ -17,7 +17,7 @@ public:
     gboolean sendQuery(GstQuery* query);
     bool isReady() { return m_ready; }
 
-    int pullChannelBuffers(GSList** bufferList);
+    guint pullChannelBuffers(GSList** bufferList);
 
     void handleNewDeinterleavePad(GstPad*);
     void deinterleavePadsConfigured();

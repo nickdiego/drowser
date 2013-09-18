@@ -59,7 +59,7 @@ AudioLiveInputPipeline::~AudioLiveInputPipeline()
     }
 }
 
-int AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
+guint AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
 {
     if (!m_ready || !m_sinkList) {
         GST_WARNING("Live-input pipeline not yet ready.");
@@ -69,7 +69,7 @@ int AudioLiveInputPipeline::pullChannelBuffers(GSList **bufferList)
     GSList* it = m_sinkList;
     GstAppSink* sink;
     GstBuffer* buffer;
-    int count;
+    guint count;
     for(count = 0; it != NULL; ++count, it = g_slist_next(it)) {
         sink = GST_APP_SINK(static_cast<GstElement*>(it->data));
         //fprintf(stderr, "*** pull appsink %d\n", count);

@@ -23,35 +23,40 @@
 #include <gst/pbutils/pbutils.h>
 
 #include <cstring>
-#include <cstdio>
 
 using namespace Nix;
 
 static bool configureSinkDevice(GstElement* autoSink);
 
-GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
+GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfOutputChannels, double sampleRate, AudioDevice::RenderCallback* renderCallback)
     : m_wavParserAvailable(false)
     , m_audioSinkAvailable(false)
     , m_pipeline(0)
     , m_sampleRate(sampleRate)
     , m_bufferSize(bufferSize)
-    , m_isDevice(false)
+    , m_providesLiveInput(false)
+    , m_inputDeviceId(0)
     , m_renderCallback(renderCallback)
 {
     if (inputDeviceId) {
         m_inputDeviceId = new char[std::strlen(inputDeviceId)];
         std::strcpy(m_inputDeviceId, inputDeviceId);
     }
-    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
+    g_print("[%s] %p inputDeviceId: \"%s\"\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
 
-    if (!std::strcmp(m_inputDeviceId, "autoaudiosrc;default"))
-        m_isDevice = true;
+    // FIXME hardcoded inputDeviceId
+    if (numberOfInputChannels && !std::strcmp(m_inputDeviceId, "autoaudiosrc;default")) {
+        g_print("[%s] %p live-input enabled\n", __PRETTY_FUNCTION__, this);
+        m_providesLiveInput = true;
+    }
 
-    // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
                                                                             "rate", sampleRate,
+                                                                            "output-channels", numberOfOutputChannels,
+                                                                            "input-channels", numberOfInputChannels,
+                                                                            "is-live", m_providesLiveInput,
                                                                             "handler", renderCallback,
                                                                             "frames", bufferSize, NULL));
 
@@ -76,7 +81,7 @@ GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, uns
 
 GstAudioDevice::~GstAudioDevice()
 {
-    printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
+    g_print("[%s] %p\n", __PRETTY_FUNCTION__, this);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
     delete m_inputDeviceId;
@@ -90,8 +95,10 @@ void GstAudioDevice::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
     if (!audioSink)
         return;
 
-    if (!configureSinkDevice(audioSink))
-        GST_WARNING_OBJECT(audioSink, "Couldn't configure sink device");
+    if (providesLiveInput()) {
+        if (!configureSinkDevice(audioSink))
+            GST_WARNING_OBJECT(audioSink, "Couldn't configure sink device");
+    }
 
     // Autoaudiosink does the real sink detection in the GST_STATE_NULL->READY transition
     // so it's best to roll it to READY as soon as possible to ensure the underlying platform
