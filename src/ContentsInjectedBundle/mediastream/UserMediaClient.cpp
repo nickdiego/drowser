@@ -55,7 +55,7 @@ void UserMediaClient::requestUserMedia(Nix::UserMediaRequest& request, const std
     if (request.audio()) {
         audioTracks = std::vector<Nix::MediaStreamTrack>((size_t) 1);
         Nix::MediaStreamTrack audioTrack;
-        audioTrack.initialize(audioSources[0].id(), audioSources[0]);
+        audioTrack.initialize(audioSources[0]);
         audioTracks[0] = audioTrack;
     }
 
