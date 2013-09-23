@@ -22,29 +22,47 @@
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
 
+#include <cstring>
+#include <cstdio>
+
 using namespace Nix;
 
-GstAudioDevice::GstAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, AudioDevice::RenderCallback* callback)
+
+GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
     : m_wavParserAvailable(false)
     , m_audioSinkAvailable(false)
     , m_pipeline(0)
     , m_sampleRate(sampleRate)
+    , m_bufferSize(bufferSize)
+    , m_isDevice(false)
+    , m_renderCallback(renderCallback)
 {
+    if (inputDeviceId) {
+        m_inputDeviceId = new char[std::strlen(inputDeviceId)];
+        std::strcpy(m_inputDeviceId, inputDeviceId);
+    }
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
+
+    if (!std::strcmp(m_inputDeviceId, "autoaudiosrc;default"))
+        m_isDevice = true;
+
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
+
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
                                                                             "rate", sampleRate,
-                                                                            "handler", callback,
+                                                                            "handler", renderCallback,
                                                                             "frames", bufferSize, NULL));
 
     GstElement* wavParser = gst_element_factory_make("wavparse", 0);
 
     m_wavParserAvailable = wavParser;
 
-    //ASSERT_WITH_MESSAGE(m_wavParserAvailable, "Failed to create GStreamer wavparse element");
-    if (!m_wavParserAvailable)
+    if (!m_wavParserAvailable) {
+        g_error("Failed to create GStreamer wavparse element");
         return;
+    }
 
     gst_bin_add_many(GST_BIN(m_pipeline), webkitAudioSrc, wavParser, NULL);
     gst_element_link_pads_full(webkitAudioSrc, "src", wavParser, "sink", GST_PAD_LINK_CHECK_NOTHING);
@@ -57,11 +75,11 @@ GstAudioDevice::~GstAudioDevice()
 {
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
+    delete m_inputDeviceId;
 }
 
 void GstAudioDevice::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 {
-    //FIXME: POSSIBLE LEAK!!!
     GstElement* audioSink = gst_element_factory_make("autoaudiosink", 0);
     m_audioSinkAvailable = audioSink;
 
@@ -88,11 +106,12 @@ void GstAudioDevice::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
     // Link audioconvert to audiosink and roll states.
     gst_element_link_pads_full(audioConvert, "src", audioSink, "sink", GST_PAD_LINK_CHECK_NOTHING);
     gst_element_sync_state_with_parent(audioConvert);
-    gst_element_sync_state_with_parent(audioSink); //FIXME: I believe we should delete audioSink after this.
+    gst_element_sync_state_with_parent(audioSink);
 }
 
 void GstAudioDevice::start()
 {
+    printf("[%s] %p {%s}\n", __PRETTY_FUNCTION__, this, m_inputDeviceId);
     if (!m_wavParserAvailable)
         return;
 

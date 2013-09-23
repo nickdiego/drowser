@@ -41,8 +41,8 @@ struct _WebKitWebAudioSourcePrivate {
     Nix::AudioDevice::RenderCallback* handler;
     guint framesToPull;
 
-    GstElement* interleave; //FIXME: WILL LEAK!!!
-    GstElement* wavEncoder; //FIXME: WILL LEAK!!!
+    GstElement* interleave;
+    GstElement* wavEncoder;
 
     GstTask* task;
     GRecMutex mutex;
@@ -246,7 +246,6 @@ static void webKitWebAudioSrcConstructed(GObject* object)
         gst_element_link_pads_full(queue, "src", capsfilter, "sink", GST_PAD_LINK_CHECK_NOTHING);
         gst_element_link_pads_full(capsfilter, "src", audioconvert, "sink", GST_PAD_LINK_CHECK_NOTHING);
         gst_element_link_pads_full(audioconvert, "src", priv->interleave, 0, GST_PAD_LINK_CHECK_NOTHING);
-
     }
     priv->pads = g_slist_reverse(priv->pads);
 
@@ -314,9 +313,10 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
 {
     WebKitWebAudioSourcePrivate* priv = src->priv;
 
-    if (!priv->handler)
+    if (!priv->handler) {
+        GST_WARNING_OBJECT(src, "No handler, ignoring.");
         return;
-
+    }
     GSList* channelBufferList = 0;
     unsigned bufferSize = priv->framesToPull * sizeof(float);
     float** audioData = (float**) malloc(g_slist_length(priv->pads) * sizeof(float*));
@@ -374,7 +374,7 @@ static GstStateChangeReturn webKitWebAudioSrcChangeState(GstElement* element, Gs
 
     returnValue = GST_ELEMENT_CLASS(parent_class)->change_state(element, transition);
     if (returnValue == GST_STATE_CHANGE_FAILURE) {
-        GST_DEBUG_OBJECT(src, "State change failed");
+        GST_WARNING_OBJECT(src, "State change failed");
         return returnValue;
     }
 

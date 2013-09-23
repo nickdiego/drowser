@@ -6,7 +6,7 @@
 
 class GstAudioDevice : public Nix::AudioDevice {
 public:
-    GstAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, Nix::AudioDevice::RenderCallback* renderCallback);
+    GstAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, Nix::AudioDevice::RenderCallback* renderCallback);
     virtual ~GstAudioDevice();
 
     virtual void start();
@@ -21,6 +21,10 @@ private:
     bool m_audioSinkAvailable;
     GstElement* m_pipeline;
     double m_sampleRate;
+    size_t m_bufferSize;
+    bool m_isDevice;
+    char* m_inputDeviceId;
+    Nix::AudioDevice::RenderCallback* m_renderCallback;
 };
 
 #endif
