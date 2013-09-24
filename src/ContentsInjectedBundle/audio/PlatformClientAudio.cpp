@@ -5,6 +5,7 @@
 #include <NixPlatform/AudioBus.h>
 
 #include <cstdio>
+#include <cstring>
 
 using namespace Nix;
 
@@ -20,6 +21,7 @@ bool initializeAudioBackend()
 
 bool PlatformClient::loadAudioResource(AudioBus* destinationBus, const char* audioFileData, size_t dataSize, double sampleRate)
 {
+    printf("[%s]\n", __PRETTY_FUNCTION__);
     return AudioFileReader(audioFileData, dataSize).createBus(destinationBus, sampleRate);
 }
 

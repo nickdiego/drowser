@@ -27,6 +27,7 @@
 
 using namespace Nix;
 
+static bool configureSinkDevice(GstElement* autoSink);
 
 GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, unsigned, unsigned, double sampleRate, AudioDevice::RenderCallback* renderCallback)
     : m_wavParserAvailable(false)
@@ -47,7 +48,6 @@ GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, uns
         m_isDevice = true;
 
     // FIXME: NUMBER OF CHANNELS NOT USED??????????/ WHY??????????
-
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,
@@ -67,12 +67,16 @@ GstAudioDevice::GstAudioDevice(const char* inputDeviceId, size_t bufferSize, uns
     gst_bin_add_many(GST_BIN(m_pipeline), webkitAudioSrc, wavParser, NULL);
     gst_element_link_pads_full(webkitAudioSrc, "src", wavParser, "sink", GST_PAD_LINK_CHECK_NOTHING);
 
+    gst_element_sync_state_with_parent(webkitAudioSrc);
+    gst_element_sync_state_with_parent(wavParser);
+
     GstPad* srcPad = gst_element_get_static_pad(wavParser, "src");
     finishBuildingPipelineAfterWavParserPadReady(srcPad);
 }
 
 GstAudioDevice::~GstAudioDevice()
 {
+    printf("[%s] %p\n", __PRETTY_FUNCTION__, this);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     gst_object_unref(m_pipeline);
     delete m_inputDeviceId;
@@ -85,6 +89,9 @@ void GstAudioDevice::finishBuildingPipelineAfterWavParserPadReady(GstPad* pad)
 
     if (!audioSink)
         return;
+
+    if (!configureSinkDevice(audioSink))
+        GST_WARNING_OBJECT(audioSink, "Couldn't configure sink device");
 
     // Autoaudiosink does the real sink detection in the GST_STATE_NULL->READY transition
     // so it's best to roll it to READY as soon as possible to ensure the underlying platform
@@ -124,4 +131,32 @@ void GstAudioDevice::stop()
         return;
 
     gst_element_set_state(m_pipeline, GST_STATE_PAUSED);
+}
+
+static bool configureSinkDevice(GstElement* autoSink) {
+    GstElement* deviceElement;
+
+    GstChildProxy* childProxy = GST_CHILD_PROXY(autoSink);
+    if (!childProxy)
+        return false;
+
+    GstStateChangeReturn stateChangeResult = gst_element_set_state(autoSink, GST_STATE_READY);
+    if (stateChangeResult != GST_STATE_CHANGE_SUCCESS)
+        return false;
+
+    if (gst_child_proxy_get_children_count(childProxy))
+        deviceElement = GST_ELEMENT(gst_child_proxy_get_child_by_index(childProxy, 0));
+
+//#if 0
+    // FIXME temp workaround for pulsesink underflow warning issues
+    // probably something related to LATENCY event failing in "play"
+    // pipeline on startup. This adds some latency to the audio rendering
+    g_object_set(deviceElement, "buffer-time", (gint64)100000, NULL);
+    g_object_set(deviceElement, "latency-time", (gint64)100000, NULL);
+    g_object_set(deviceElement, "drift-tolerance", (gint64)1000000, NULL);
+//#endif
+
+    GST_WARNING_OBJECT(deviceElement, "configured.");
+    gst_object_unref(GST_OBJECT(deviceElement));
+    return true;
 }
