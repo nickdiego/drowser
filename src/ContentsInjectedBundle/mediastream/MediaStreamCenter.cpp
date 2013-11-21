@@ -24,20 +24,25 @@
  */
 
 #include "MediaStreamCenter.h"
+#include "MediaStreamCenterGStreamer.h"
+
 #include <NixPlatform/MediaStreamAudioSource.h>
 #include <NixPlatform/MediaStreamCenter.h>
 #include <NixPlatform/MediaStreamSource.h>
 
+#include <cassert>
 #include <cstdio>
 #include <glib.h>
 #include <gst/gst.h>
 
-MediaStreamCenter::MediaStreamCenter()
+MediaStreamCenter::MediaStreamCenter(): m_impl(MediaStreamCenterGStreamer::create())
 {
 }
 
 MediaStreamCenter::~MediaStreamCenter()
 {
+    // FIXME use std::unique_ptr instead of manual memory management ??
+    delete m_impl;
 }
 
 const char* MediaStreamCenter::validateRequestConstraints(Nix::MediaConstraints& audioConstraints, Nix::MediaConstraints& videoConstraints)
@@ -51,22 +56,13 @@ Nix::MediaStream MediaStreamCenter::createMediaStream(Nix::MediaConstraints& aud
     std::vector<Nix::MediaStreamSource*> audioSources;
     std::vector<Nix::MediaStreamSource*> videoSources;
 
-    // FIXME: MediaStreamSource's device id is still hardcoded, study how to
-    // get an actual device to work together with Nix::AudioDestination.
     if (!audioConstraints.isNull()) {
-        GstElement* audioSrc = gst_element_factory_make("autoaudiosrc", "autosrc");
-        if (audioSrc) {
-            audioSources = std::vector<Nix::MediaStreamSource*>(1);
+        Nix::MediaStreamSource* audioSource = m_impl->firstSource(Nix::MediaStreamSource::Audio);
 
-            char* deviceId = gst_element_get_name(gst_element_get_factory(audioSrc));
-            char buffer[100];
-            sprintf(buffer, "%s;default", deviceId);
-            Nix::MediaStreamAudioSource* tmp = new Nix::MediaStreamAudioSource();
-            tmp->setDeviceId(buffer);
-            audioSources[0] = tmp;
-            delete deviceId;
-        } else
-            g_object_unref(audioSrc);
+        assert(audioSource != nullptr);
+        LOG_MEDIA_MESSAGE("%s got audio source id='%s'", __PRETTY_FUNCTION__, audioSource->id());
+
+        audioSources.push_back(audioSource);
     }
 
     if (!videoConstraints.isNull()) {

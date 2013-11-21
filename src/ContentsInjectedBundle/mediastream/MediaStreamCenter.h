@@ -30,12 +30,17 @@
 #include <NixPlatform/MediaStream.h>
 #include <NixPlatform/MediaStreamCenter.h>
 
+class MediaStreamCenterGStreamer;
+
 class MediaStreamCenter : public Nix::MediaStreamCenter {
 public:
     MediaStreamCenter();
     virtual ~MediaStreamCenter();
     virtual const char* validateRequestConstraints(Nix::MediaConstraints& audioConstraints, Nix::MediaConstraints& videoConstraints) override;
     virtual Nix::MediaStream createMediaStream(Nix::MediaConstraints& audioConstraints, Nix::MediaConstraints& videoConstraints) override;
+
+private:
+    MediaStreamCenterGStreamer* m_impl;
 };
 
 #endif // MediaStreamCenter_h

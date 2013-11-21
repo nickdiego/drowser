@@ -6,6 +6,8 @@ include_directories(
 set(mediastream_SOURCES
   BrowserPlatformUserMedia.cpp
   MediaStreamCenter.cpp
+  CentralPipelineUnit.cpp
+  MediaStreamCenterGStreamer.cpp
 )
 
 set(mediastream_LIBRARIES
