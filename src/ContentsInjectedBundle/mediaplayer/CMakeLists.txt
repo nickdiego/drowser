@@ -21,6 +21,9 @@ link_directories(
 
 set(mediaplayer_SOURCES
   MediaPlayer.cpp
+  MediaPlayerBackend.cpp
+  GstreamerBackendBase.cpp
+  GstreamerBackend.cpp
 )
 
 set(mediaplayer_LIBRARIES

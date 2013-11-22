@@ -23,35 +23,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaPlayer_h
-#define MediaPlayer_h
+#ifndef GstreamerBackend_h
+#define GstreamerBackend_h
 
-#include <NixPlatform/MediaPlayer.h>
+#include "GstreamerBackendBase.h"
 
-class MediaPlayerBackend;
-
-class MediaPlayer : public Nix::MediaPlayer
+class GstreamerBackend : public GstreamerBackendBase
 {
 public:
-    MediaPlayer(Nix::MediaPlayerClient*);
-    virtual ~MediaPlayer();
+    GstreamerBackend(Nix::MediaPlayerClient *client);
+    virtual ~GstreamerBackend();
 
-    virtual void play() override;
-    virtual void pause() override;
-    virtual float duration() const override;
-    virtual float currentTime() const override;
-    virtual void seek(float) override;
-    virtual void setVolume(float) override;
-    virtual void setMuted(bool) override;
     virtual void load(const char* url) override;
-    virtual bool seeking() const override;
-    virtual float maxTimeSeekable() const override;
-    virtual void setPlaybackRate(float) override;
-    virtual bool isLiveStream() const override;
+
+protected:
+    virtual bool createAudioSink() override;
+    virtual void destroyAudioSink() override;
+    virtual void handleMessage(GstMessage *message);
 
 private:
-    MediaPlayerBackend *m_backend;
-    void selectMediaBackend();
+    void setDownloadBuffering();
+    void updateStates();
 };
 
-#endif // MediaPlayer_h
+#endif // GstreamerBackend_h

@@ -23,35 +23,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaPlayer_h
-#define MediaPlayer_h
+#ifndef MediaPlayerBackend_h
+#define MediaPlayerBackend_h
 
 #include <NixPlatform/MediaPlayer.h>
 
-class MediaPlayerBackend;
-
-class MediaPlayer : public Nix::MediaPlayer
+class MediaPlayerBackend
 {
 public:
-    MediaPlayer(Nix::MediaPlayerClient*);
-    virtual ~MediaPlayer();
+    MediaPlayerBackend(Nix::MediaPlayerClient* client);
+    virtual ~MediaPlayerBackend();
 
-    virtual void play() override;
-    virtual void pause() override;
-    virtual float duration() const override;
-    virtual float currentTime() const override;
-    virtual void seek(float) override;
-    virtual void setVolume(float) override;
-    virtual void setMuted(bool) override;
-    virtual void load(const char* url) override;
-    virtual bool seeking() const override;
-    virtual float maxTimeSeekable() const override;
-    virtual void setPlaybackRate(float) override;
-    virtual bool isLiveStream() const override;
+    virtual void play() = 0;
+    virtual void pause() = 0;
+    virtual void seek(float) = 0;
+    virtual float duration() const = 0;
+    virtual float currentTime() const = 0;
+    virtual void setVolume(float) = 0;
+    virtual void setMuted(bool) = 0;
+    virtual void load(const char* url) = 0;
+    virtual bool seeking() const = 0;
+    virtual float maxTimeSeekable() const = 0;
+    virtual void setPlaybackRate(float) = 0;
+    virtual bool isLiveStream() const = 0;
+    virtual bool isPaused() const = 0;
 
-private:
-    MediaPlayerBackend *m_backend;
-    void selectMediaBackend();
+protected:
+    Nix::MediaPlayerClient *m_playerClient;
 };
 
-#endif // MediaPlayer_h
+#endif // MediaPlayerBackend_h
