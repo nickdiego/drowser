@@ -4,6 +4,7 @@ pkg_check_modules(GSTREAMER-AUDIO REQUIRED gstreamer-audio-1.0)
 pkg_check_modules(GSTREAMER-PBUTILS REQUIRED gstreamer-pbutils-1.0)
 
 include_directories(
+  ../mediastream #FIXME
   ${WebKitNix_INCLUDE_DIRS}
   ${GSTREAMER_INCLUDE_DIRS}
   ${GSTREAMER-APP_INCLUDE_DIRS}
@@ -24,6 +25,7 @@ set(mediaplayer_SOURCES
   MediaPlayerBackend.cpp
   GstreamerBackendBase.cpp
   GstreamerBackend.cpp
+  GstreamerStreamBackend.cpp
 )
 
 set(mediaplayer_LIBRARIES
