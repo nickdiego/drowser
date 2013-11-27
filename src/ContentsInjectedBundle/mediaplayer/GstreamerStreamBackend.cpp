@@ -80,81 +80,30 @@ void GstreamerStreamBackend::load(const char* url)
         return;
     }
 
-    g_object_set(m_audioSink, "uri", url, NULL);
+    m_streamDescriptor = MediaStreamRegistry::registry().lookupMediaStreamDescriptor(url);
+    if (!m_streamDescriptor || m_streamDescriptor->ended()) {
+        loadingFailed(MediaPlayer::NetworkError);
+        return;
+    }
 
-    gst_element_set_state(m_audioSink, GST_STATE_PAUSED);
-    setDownloadBuffering();
+    m_readyState = MediaPlayer::HaveNothing;
+    m_networkState = MediaPlayer::Loading;
+    m_player->networkStateChanged();
+    m_player->readyStateChanged();
+
+    if (!internalLoad())
+        return;
+
+    // If the stream contains video, wait for first video frame before setting
+    // HaveEnoughData
+    if (!hasVideo())
+        m_readyState = MediaPlayer::HaveEnoughData;
+
+    m_player->readyStateChanged();
 }
 
 void GstreamerStreamBackend::handleMessage(GstMessage* message)
 {
-}
-
-void GstreamerStreamBackend::updateStates()
-{
-    GstState state;
-    GstState pending;
-
-    GstStateChangeReturn ret = gst_element_get_state(m_audioSink,
-        &state, &pending, 250 * GST_NSECOND);
-
-    Nix::MediaPlayerClient::ReadyState oldReadyState = m_readyState;
-    Nix::MediaPlayerClient::NetworkState oldNetworkState = m_networkState;
-
-    switch (ret) {
-    case GST_STATE_CHANGE_FAILURE:
-        GST_WARNING("Failed to change state");
-        break;
-    case GST_STATE_CHANGE_SUCCESS:
-        m_isLive = false;
-
-        switch (state) {
-        case GST_STATE_READY:
-            m_readyState = Nix::MediaPlayerClient::HaveMetadata;
-            m_networkState = Nix::MediaPlayerClient::Empty;
-            break;
-        case GST_STATE_PAUSED:
-        case GST_STATE_PLAYING:
-            if (m_seeking) {
-                m_seeking = false;
-                m_playerClient->currentTimeChanged();
-            }
-
-            if (m_bufferingFinished) {
-                m_readyState = Nix::MediaPlayerClient::HaveEnoughData;
-                m_networkState = Nix::MediaPlayerClient::Loaded;
-            } else {
-                m_readyState = Nix::MediaPlayerClient::HaveCurrentData;
-                m_networkState = Nix::MediaPlayerClient::Loading;
-            }
-
-            if (m_pendingSeek) {
-                m_pendingSeek = false;
-                seek(m_seekTime);
-            }
-            break;
-        default:
-            break;
-        }
-        break;
-    case GST_STATE_CHANGE_NO_PREROLL:
-        m_isLive = true;
-        setDownloadBuffering();
-
-        if (state == GST_STATE_PAUSED) {
-            m_readyState = Nix::MediaPlayerClient::HaveEnoughData;
-            m_networkState = Nix::MediaPlayerClient::Loading;
-        }
-        break;
-    default:
-        break;
-    }
-
-    if (oldReadyState != m_readyState)
-        m_playerClient->readyStateChanged(m_readyState);
-
-    if (oldNetworkState != m_networkState)
-        m_playerClient->networkStateChanged(m_networkState);
 }
 
 void GstreamerStreamBackend::setDownloadBuffering()
@@ -212,4 +161,39 @@ void GstreamerStreamBackend::stop()
     if (!m_audioSourceId.empty())
         cpu.disconnectFromSource(m_audioSourceId, m_audioSink);
     m_audioSourceId = "";
+}
+
+void GstreamerStreamBackend::play()
+{
+    if (!m_streamDescriptor || m_streamDescriptor->ended()) {
+        m_readyState = MediaPlayer::HaveNothing;
+        loadingFailed(MediaPlayer::Empty);
+        return;
+    }
+
+    m_paused = false;
+    internalLoad();
+}
+
+void GstreamerStreamBackend::pause()
+{
+    m_paused = true;
+    stop();
+}
+
+bool GstreamerStreamBackend::internalLoad()
+{
+    if (!m_stopped)
+        return false;
+
+    m_stopped = false;
+    if (!m_stream || m_stream->ended()) {
+        loadingFailed(MediaPlayer::NetworkError);
+        return false;
+    }
+    return connectToGSTLiveStream(m_streamDescriptor.get());
+}
+
+bool GstreamerStreamBackend::connectToGSTLiveStream(Nix::MediaStream* streamDescriptor)
+{
 }

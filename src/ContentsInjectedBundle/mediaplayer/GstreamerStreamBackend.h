@@ -41,12 +41,16 @@ public:
     GstreamerStreamBackend(Nix::MediaPlayerClient *client);
     virtual ~GstreamerStreamBackend();
 
-    virtual void load(const char* url);
+    virtual void load(const char* url) override;
+    virtual void play() override;
+    virtual void pause() override;
     virtual void sourceStateChanged();
     virtual void sourceMutedChanged();
     virtual void sourceEnabledChanged();
     virtual bool stopped();
     void stop();
+    void internalLoad();
+    bool connectToGSTLiveStream(Nix::MediaStream* stream);
 
 protected:
     virtual bool createAudioSink() override;
@@ -59,7 +63,6 @@ private:
     bool m_stopped;
 
     void setDownloadBuffering();
-    void updateStates();
 };
 
 #endif // GstreamerStreamBackend_h
