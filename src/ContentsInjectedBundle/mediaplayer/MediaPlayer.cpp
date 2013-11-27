@@ -26,7 +26,7 @@
 #include "MediaPlayer.h"
 
 #include "BrowserPlatform.h"
-#include "GstreamerBackend.h"
+#include "DefaultMediaPlayerBackend.h"
 #include "MediaPlayerBackend.h"
 
 Nix::MediaPlayer* BrowserPlatform::createMediaPlayer(Nix::MediaPlayerClient* client)
@@ -148,5 +148,5 @@ void MediaPlayer::selectMediaBackend()
         delete m_backend;
 
     // FIXME: create StreamGstreamerBackend
-    m_backend = new GstreamerBackend(m_playerClient);
+    m_backend = new DefaultMediaPlayerBackend(m_playerClient);
 }

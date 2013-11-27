@@ -23,8 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GstreamerBackendBase_h
-#define GstreamerBackendBase_h
+#ifndef MediaPlayerBackendBase_h
+#define MediaPlayerBackendBase_h
 
 #include "MediaPlayerBackend.h"
 
@@ -47,24 +47,29 @@ typedef enum {
     GST_PLAY_FLAG_SOFT_COLORBALANCE = (1 << 10)
 } GstPlayFlags;
 
-class GstreamerBackendBase : public MediaPlayerBackend
+/* GStreamer-based implementation of MediaPlayerBackend interface */
+class MediaPlayerBackendBase : public MediaPlayerBackend
 {
 public:
-    GstreamerBackendBase(Nix::MediaPlayerClient* client);
-    virtual ~GstreamerBackendBase();
+    MediaPlayerBackendBase(Nix::MediaPlayerClient* client);
+    virtual ~MediaPlayerBackendBase();
 
-    virtual void play();
-    virtual void pause();
-    virtual void seek(float);
-    virtual float duration() const;
-    virtual float currentTime() const;
-    virtual void setVolume(float);
-    virtual void setMuted(bool);
-    virtual bool seeking() const;
-    virtual float maxTimeSeekable() const;
-    virtual void setPlaybackRate(float);
-    virtual bool isLiveStream() const;
-    virtual bool isPaused() const;
+    // MediaPlayerBackend methods
+    virtual void play() override;
+    virtual void pause() override;
+    virtual void seek(float) override;
+    virtual float duration() const override;
+    virtual float currentTime() const override;
+    virtual void setVolume(float) override;
+    virtual void setMuted(bool) override;
+    virtual bool seeking() const override;
+    virtual float maxTimeSeekable() const override;
+    virtual void setPlaybackRate(float) override;
+    virtual bool isLiveStream() const override;
+    virtual bool isPaused() const override;
+
+    virtual void setReadyState(Nix::MediaPlayerClient::ReadyState readyState);
+    virtual void setNetworkState(Nix::MediaPlayerClient::NetworkState readyState);
 
 protected:
     GstElement* m_audioSink;
@@ -78,10 +83,10 @@ protected:
     Nix::MediaPlayerClient::ReadyState m_readyState;
     Nix::MediaPlayerClient::NetworkState m_networkState;
 
-    static void onGstBusMessage(GstBus*, GstMessage*, GstreamerBackendBase* backend);
+    static void onGstBusMessage(GstBus*, GstMessage*, MediaPlayerBackendBase* backend);
     virtual bool createAudioSink() { return false; }
     virtual void destroyAudioSink() {}
     virtual void handleMessage(GstMessage *message) {}
 };
 
-#endif // GstreamerBackendBase_h
+#endif // MediaPlayerBackendBase_h

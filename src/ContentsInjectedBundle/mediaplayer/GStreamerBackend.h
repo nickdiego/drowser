@@ -23,33 +23,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaPlayerBackend_h
-#define MediaPlayerBackend_h
+#ifndef DefaultMediaPlayerBackend_h
+#define DefaultMediaPlayerBackend_h
 
-#include <NixPlatform/MediaPlayer.h>
+#include "DefaultMediaPlayerBackendBase.h"
 
-class MediaPlayerBackend
+class DefaultMediaPlayerBackend : public MediaPlayerBackendBase
 {
 public:
-    MediaPlayerBackend(Nix::MediaPlayerClient* client): m_playerClient(client) { }
-    virtual ~MediaPlayerBackend() { }
+    DefaultMediaPlayerBackend(Nix::MediaPlayerClient *client);
+    virtual ~DefaultMediaPlayerBackend();
 
-    virtual void play() = 0;
-    virtual void pause() = 0;
-    virtual void seek(float) = 0;
-    virtual float duration() const = 0;
-    virtual float currentTime() const = 0;
-    virtual void setVolume(float) = 0;
-    virtual void setMuted(bool) = 0;
-    virtual void load(const char* url) = 0;
-    virtual bool seeking() const = 0;
-    virtual float maxTimeSeekable() const = 0;
-    virtual void setPlaybackRate(float) = 0;
-    virtual bool isLiveStream() const = 0;
-    virtual bool isPaused() const = 0;
+    virtual void load(const char* url) override;
 
 protected:
-    Nix::MediaPlayerClient *m_playerClient;
+    virtual bool createAudioSink() override;
+    virtual void destroyAudioSink() override;
+    virtual void handleMessage(GstMessage *message);
+
+private:
+    void setDownloadBuffering();
+    void updateStates();
 };
 
-#endif // MediaPlayerBackend_h
+#endif // DefaultMediaPlayerBackend_h

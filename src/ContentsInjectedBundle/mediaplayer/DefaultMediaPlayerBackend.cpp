@@ -23,24 +23,24 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "GstreamerBackend.h"
+#include "DefaultMediaPlayerBackend.h"
 
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <limits>
 
-GstreamerBackend::GstreamerBackend(Nix::MediaPlayerClient* client)
-    : GstreamerBackendBase(client)
+DefaultMediaPlayerBackend::DefaultMediaPlayerBackend(Nix::MediaPlayerClient* client)
+    : MediaPlayerBackendBase(client)
 {
 }
 
-GstreamerBackend::~GstreamerBackend()
+DefaultMediaPlayerBackend::~DefaultMediaPlayerBackend()
 {
     destroyAudioSink();
 }
 
-bool GstreamerBackend::createAudioSink()
+bool DefaultMediaPlayerBackend::createAudioSink()
 {
     assert(!m_audioSink);
 
@@ -82,7 +82,7 @@ bool GstreamerBackend::createAudioSink()
     return true;
 }
 
-void GstreamerBackend::destroyAudioSink()
+void DefaultMediaPlayerBackend::destroyAudioSink()
 {
     if (!m_audioSink)
         return;
@@ -90,13 +90,13 @@ void GstreamerBackend::destroyAudioSink()
     gst_object_unref(m_audioSink);
 }
 
-void GstreamerBackend::load(const char* url)
+void DefaultMediaPlayerBackend::load(const char* url)
 {
     gst_init_check(0, 0, 0);
 
     if (!m_audioSink && !createAudioSink()) {
         // Could be a decode error as well, but just report a error is enough for now.
-        m_playerClient->networkStateChanged(Nix::MediaPlayerClient::NetworkError);
+        setNetworkState(Nix::MediaPlayerClient::NetworkError);
         return;
     }
 
@@ -106,7 +106,7 @@ void GstreamerBackend::load(const char* url)
     setDownloadBuffering();
 }
 
-void GstreamerBackend::handleMessage(GstMessage* message)
+void DefaultMediaPlayerBackend::handleMessage(GstMessage* message)
 {
     switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_ERROR: {
@@ -161,16 +161,13 @@ void GstreamerBackend::handleMessage(GstMessage* message)
     }
 }
 
-void GstreamerBackend::updateStates()
+void DefaultMediaPlayerBackend::updateStates()
 {
     GstState state;
     GstState pending;
 
     GstStateChangeReturn ret = gst_element_get_state(m_audioSink,
         &state, &pending, 250 * GST_NSECOND);
-
-    Nix::MediaPlayerClient::ReadyState oldReadyState = m_readyState;
-    Nix::MediaPlayerClient::NetworkState oldNetworkState = m_networkState;
 
     switch (ret) {
     case GST_STATE_CHANGE_FAILURE:
@@ -181,8 +178,8 @@ void GstreamerBackend::updateStates()
 
         switch (state) {
         case GST_STATE_READY:
-            m_readyState = Nix::MediaPlayerClient::HaveMetadata;
-            m_networkState = Nix::MediaPlayerClient::Empty;
+            setReadyState(Nix::MediaPlayerClient::HaveMetadata);
+            setNetworkState(Nix::MediaPlayerClient::Empty);
             break;
         case GST_STATE_PAUSED:
         case GST_STATE_PLAYING:
@@ -192,11 +189,11 @@ void GstreamerBackend::updateStates()
             }
 
             if (m_bufferingFinished) {
-                m_readyState = Nix::MediaPlayerClient::HaveEnoughData;
-                m_networkState = Nix::MediaPlayerClient::Loaded;
+                setReadyState(Nix::MediaPlayerClient::HaveEnoughData);
+                setNetworkState(Nix::MediaPlayerClient::Loaded);
             } else {
-                m_readyState = Nix::MediaPlayerClient::HaveCurrentData;
-                m_networkState = Nix::MediaPlayerClient::Loading;
+                setReadyState(Nix::MediaPlayerClient::HaveCurrentData);
+                setNetworkState(Nix::MediaPlayerClient::Loading);
             }
 
             if (m_pendingSeek) {
@@ -213,22 +210,16 @@ void GstreamerBackend::updateStates()
         setDownloadBuffering();
 
         if (state == GST_STATE_PAUSED) {
-            m_readyState = Nix::MediaPlayerClient::HaveEnoughData;
-            m_networkState = Nix::MediaPlayerClient::Loading;
+            setReadyState(Nix::MediaPlayerClient::HaveEnoughData);
+            setNetworkState(Nix::MediaPlayerClient::Loading);
         }
         break;
     default:
         break;
     }
-
-    if (oldReadyState != m_readyState)
-        m_playerClient->readyStateChanged(m_readyState);
-
-    if (oldNetworkState != m_networkState)
-        m_playerClient->networkStateChanged(m_networkState);
 }
 
-void GstreamerBackend::setDownloadBuffering()
+void DefaultMediaPlayerBackend::setDownloadBuffering()
 {
     assert(m_audioSink);
 

@@ -23,7 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "GstreamerBackendBase.h"
+#include "MediaPlayerBackendBase.h"
 
 #include <gst/audio/streamvolume.h>
 #include <cassert>
@@ -33,7 +33,7 @@
 
 using namespace std;
 
-GstreamerBackendBase::GstreamerBackendBase(Nix::MediaPlayerClient* client)
+MediaPlayerBackendBase::MediaPlayerBackendBase(Nix::MediaPlayerClient* client)
     : MediaPlayerBackend(client)
     , m_audioSink(nullptr)
     , m_paused(true)
@@ -47,23 +47,23 @@ GstreamerBackendBase::GstreamerBackendBase(Nix::MediaPlayerClient* client)
 {
 }
 
-GstreamerBackendBase::~GstreamerBackendBase()
+MediaPlayerBackendBase::~MediaPlayerBackendBase()
 {
 }
 
-void GstreamerBackendBase::play()
+void MediaPlayerBackendBase::play()
 {
     gst_element_set_state(m_audioSink, GST_STATE_PLAYING);
     m_paused = false;
 }
 
-void GstreamerBackendBase::pause()
+void MediaPlayerBackendBase::pause()
 {
     gst_element_set_state(m_audioSink, GST_STATE_PAUSED);
     m_paused = true;
 }
 
-float GstreamerBackendBase::duration() const
+float MediaPlayerBackendBase::duration() const
 {
     gint64 duration = GST_CLOCK_TIME_NONE;
     gst_element_query_duration(m_audioSink, GST_FORMAT_TIME, &duration);
@@ -72,7 +72,7 @@ float GstreamerBackendBase::duration() const
     return 0;
 }
 
-float GstreamerBackendBase::currentTime() const
+float MediaPlayerBackendBase::currentTime() const
 {
     gint64 current = GST_CLOCK_TIME_NONE;
     gst_element_query_position(m_audioSink, GST_FORMAT_TIME, &current);
@@ -81,7 +81,7 @@ float GstreamerBackendBase::currentTime() const
     return 0;
 }
 
-void GstreamerBackendBase::seek(float time)
+void MediaPlayerBackendBase::seek(float time)
 {
     if (!m_audioSink)
         return;
@@ -112,12 +112,12 @@ void GstreamerBackendBase::seek(float time)
     m_seeking = true;
 }
 
-bool GstreamerBackendBase::seeking() const
+bool MediaPlayerBackendBase::seeking() const
 {
     return m_seeking;
 }
 
-float GstreamerBackendBase::maxTimeSeekable() const
+float MediaPlayerBackendBase::maxTimeSeekable() const
 {
     if (m_isLive)
         return numeric_limits<float>::infinity();
@@ -125,32 +125,48 @@ float GstreamerBackendBase::maxTimeSeekable() const
     return duration();
 }
 
-void GstreamerBackendBase::setPlaybackRate(float playbackRate)
+void MediaPlayerBackendBase::setPlaybackRate(float playbackRate)
 {
     m_playbackRate = playbackRate;
 }
 
-void GstreamerBackendBase::setVolume(float volume)
+void MediaPlayerBackendBase::setVolume(float volume)
 {
     gst_stream_volume_set_volume(GST_STREAM_VOLUME(m_audioSink), GST_STREAM_VOLUME_FORMAT_LINEAR, volume);
 }
 
-void GstreamerBackendBase::setMuted(bool mute)
+void MediaPlayerBackendBase::setMuted(bool mute)
 {
     gst_stream_volume_set_mute(GST_STREAM_VOLUME(m_audioSink), mute);
 }
 
-bool GstreamerBackendBase::isLiveStream() const
+bool MediaPlayerBackendBase::isLiveStream() const
 {
     return m_isLive;
 }
 
-void GstreamerBackendBase::onGstBusMessage(GstBus* bus, GstMessage* msg, GstreamerBackendBase* backend)
+void MediaPlayerBackendBase::setReadyState(Nix::MediaPlayerClient::ReadyState readyState)
+{
+    if (m_readyState == readyState)
+        return;
+    m_readyState = readyState;
+    m_playerClient->readyStateChanged(m_readyState);
+}
+
+void MediaPlayerBackendBase::setNetworkState(Nix::MediaPlayerClient::NetworkState networkState)
+{
+    if (m_networkState == networkState)
+        return;
+    m_networkState = networkState;
+    m_playerClient->networkStateChanged(m_networkState);
+}
+
+void MediaPlayerBackendBase::onGstBusMessage(GstBus* bus, GstMessage* msg, MediaPlayerBackendBase* backend)
 {
     backend->handleMessage(msg);
 }
 
-bool GstreamerBackendBase::isPaused() const
+bool MediaPlayerBackendBase::isPaused() const
 {
     return m_paused;
 }

@@ -25,7 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "GstreamerStreamBackend.h"
+#include "MediaStreamPlayerBackend.h"
 #include "CentralPipelineUnit.h"
 
 #include <cassert>
@@ -33,18 +33,18 @@
 #include <cstdio>
 #include <limits>
 
-GstreamerStreamBackend::GstreamerStreamBackend(Nix::MediaPlayerClient* client)
-    : GstreamerBackendBase(client)
+MediaStreamPlayerBackend::MediaStreamPlayerBackend(Nix::MediaPlayerClient* client)
+    : MediaPlayerBackendBase(client)
     , m_stopped(false)
 {
 }
 
-GstreamerStreamBackend::~GstreamerStreamBackend()
+MediaStreamPlayerBackend::~MediaStreamPlayerBackend()
 {
     destroyAudioSink();
 }
 
-bool GstreamerStreamBackend::createAudioSink()
+bool MediaStreamPlayerBackend::createAudioSink()
 {
     // FIXME: check errors
     assert(!m_audioSink);
@@ -62,7 +62,7 @@ bool GstreamerStreamBackend::createAudioSink()
     return true;
 }
 
-void GstreamerStreamBackend::destroyAudioSink()
+void MediaStreamPlayerBackend::destroyAudioSink()
 {
     if (!m_audioSink)
         return;
@@ -70,43 +70,33 @@ void GstreamerStreamBackend::destroyAudioSink()
     gst_object_unref(m_audioSink);
 }
 
-void GstreamerStreamBackend::load(const char* url)
+void MediaStreamPlayerBackend::load(const char* url)
 {
     gst_init_check(0, 0, 0);
 
     if (!m_audioSink && !createAudioSink()) {
         // Could be a decode error as well, but just report a error is enough for now.
-        m_playerClient->networkStateChanged(Nix::MediaPlayerClient::NetworkError);
+        setNetworkState(Nix::MediaPlayerClient::NetworkError);
         return;
     }
 
-    m_streamDescriptor = MediaStreamRegistry::registry().lookupMediaStreamDescriptor(url);
-    if (!m_streamDescriptor || m_streamDescriptor->ended()) {
-        loadingFailed(MediaPlayer::NetworkError);
+    if (!m_stream /*|| m_stream->ended()*/) { // FIXME
+        loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return;
     }
 
-    m_readyState = MediaPlayer::HaveNothing;
-    m_networkState = MediaPlayer::Loading;
-    m_player->networkStateChanged();
-    m_player->readyStateChanged();
+    setReadyState(Nix::MediaPlayerClient::HaveNothing);
+    setNetworkState(Nix::MediaPlayerClient::Loading);
 
     if (!internalLoad())
         return;
-
-    // If the stream contains video, wait for first video frame before setting
-    // HaveEnoughData
-    if (!hasVideo())
-        m_readyState = MediaPlayer::HaveEnoughData;
-
-    m_player->readyStateChanged();
 }
 
-void GstreamerStreamBackend::handleMessage(GstMessage* message)
+void MediaStreamPlayerBackend::handleMessage(GstMessage* message)
 {
 }
 
-void GstreamerStreamBackend::setDownloadBuffering()
+void MediaStreamPlayerBackend::setDownloadBuffering()
 {
     assert(m_audioSink);
 
@@ -119,12 +109,13 @@ void GstreamerStreamBackend::setDownloadBuffering()
         g_object_set(m_audioSink, "flags", flags | GST_PLAY_FLAG_DOWNLOAD, NULL);
 }
 
-void GstreamerStreamBackend::sourceStateChanged()
+void MediaStreamPlayerBackend::sourceReadyStateChanged()
 {
     CentralPipelineUnit& cpu = CentralPipelineUnit::instance();
     if (!m_stream|| m_stream->ended())
         stop();
 
+#if 0 //FIXME export MediaStreamTracks
     // check if the source should be ended
     if (!m_audioSourceId.empty()) {
         for (unsigned i = 0; i < m_stream->numberOfAudioStreams(); i++) {
@@ -136,22 +127,23 @@ void GstreamerStreamBackend::sourceStateChanged()
             }
         }
     }
+#endif
 }
 
-void GstreamerStreamBackend::sourceMutedChanged()
+void MediaStreamPlayerBackend::sourceMutedChanged()
 {
 }
 
-void GstreamerStreamBackend::sourceEnabledChanged()
+void MediaStreamPlayerBackend::sourceEnabledChanged()
 {
 }
 
-bool GstreamerStreamBackend::stopped()
+bool MediaStreamPlayerBackend::stopped()
 {
     return m_stopped;
 }
 
-void GstreamerStreamBackend::stop()
+void MediaStreamPlayerBackend::stop()
 {
     if (m_stopped)
         return;
@@ -163,11 +155,11 @@ void GstreamerStreamBackend::stop()
     m_audioSourceId = "";
 }
 
-void GstreamerStreamBackend::play()
+void MediaStreamPlayerBackend::play()
 {
-    if (!m_streamDescriptor || m_streamDescriptor->ended()) {
-        m_readyState = MediaPlayer::HaveNothing;
-        loadingFailed(MediaPlayer::Empty);
+    if (!m_stream/* || m_streamDescriptor->ended()*/) { //FIXME
+        m_readyState = Nix::MediaPlayerClient::HaveNothing;
+        loadingFailed(Nix::MediaPlayerClient::Empty);
         return;
     }
 
@@ -175,25 +167,32 @@ void GstreamerStreamBackend::play()
     internalLoad();
 }
 
-void GstreamerStreamBackend::pause()
+void MediaStreamPlayerBackend::pause()
 {
     m_paused = true;
     stop();
 }
 
-bool GstreamerStreamBackend::internalLoad()
+bool MediaStreamPlayerBackend::internalLoad()
 {
     if (!m_stopped)
         return false;
 
     m_stopped = false;
-    if (!m_stream || m_stream->ended()) {
-        loadingFailed(MediaPlayer::NetworkError);
+    if (!m_stream/* || m_stream->ended()*/) { //FIXME
+        loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return false;
     }
-    return connectToGSTLiveStream(m_streamDescriptor.get());
+    return connectToGSTLiveStream(m_stream);
 }
 
-bool GstreamerStreamBackend::connectToGSTLiveStream(Nix::MediaStream* streamDescriptor)
+// FIXME implement
+bool MediaStreamPlayerBackend::connectToGSTLiveStream(Nix::MediaStream* streamDescriptor)
+{
+    return true;
+}
+
+// FIXME implement
+void MediaStreamPlayerBackend::loadingFailed(Nix::MediaPlayerClient::NetworkState networkState)
 {
 }

@@ -25,37 +25,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GstreamerStreamBackend_h
-#define GstreamerStreamBackend_h
+#ifndef MediaStreamPlayerBackend_h
+#define MediaStreamPlayerBackend_h
 
-#include "GstreamerBackendBase.h"
+#include "MediaPlayerBackendBase.h"
 
 #include <NixPlatform/MediaStream.h>
 #include <NixPlatform/MediaStreamSource.h>
 
 #include <string>
 
-class GstreamerStreamBackend : public GstreamerBackendBase, private Nix::MediaStreamSource::Observer
+class MediaStreamPlayerBackend : public MediaPlayerBackendBase, private Nix::MediaStreamSource::Observer
 {
 public:
-    GstreamerStreamBackend(Nix::MediaPlayerClient *client);
-    virtual ~GstreamerStreamBackend();
+    MediaStreamPlayerBackend(Nix::MediaPlayerClient *client);
+    virtual ~MediaStreamPlayerBackend();
 
+    // MediaPlayerBackendBase methods
     virtual void load(const char* url) override;
     virtual void play() override;
     virtual void pause() override;
-    virtual void sourceStateChanged();
-    virtual void sourceMutedChanged();
-    virtual void sourceEnabledChanged();
-    virtual bool stopped();
-    void stop();
-    void internalLoad();
-    bool connectToGSTLiveStream(Nix::MediaStream* stream);
+
+    // Nix::MediaStreamSource::Observer methods
+    virtual void sourceReadyStateChanged() override;
+    virtual void sourceMutedChanged() override;
+    virtual void sourceEnabledChanged() override;
 
 protected:
     virtual bool createAudioSink() override;
     virtual void destroyAudioSink() override;
-    virtual void handleMessage(GstMessage *message);
+    virtual void handleMessage(GstMessage *message) override;
+    void stop();
+    bool stopped();
+
+    void loadingFailed(Nix::MediaPlayerClient::NetworkState networkState); //FIXME Move to MediaPlayerBackendBase ??
+    bool internalLoad();
+    bool connectToGSTLiveStream(Nix::MediaStream* stream);
 
 private:
     Nix::MediaStream* m_stream;
@@ -65,4 +70,4 @@ private:
     void setDownloadBuffering();
 };
 
-#endif // GstreamerStreamBackend_h
+#endif // MediaStreamPlayerBackend_h

@@ -23,13 +23,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "MediaPlayerBackend.h"
+#ifndef DefaultMediaPlayerBackend_h
+#define DefaultMediaPlayerBackend_h
 
-MediaPlayerBackend::MediaPlayerBackend(Nix::MediaPlayerClient* client)
-    : m_playerClient(client)
-{
-}
+#include "MediaPlayerBackendBase.h"
 
-MediaPlayerBackend::~MediaPlayerBackend()
+class DefaultMediaPlayerBackend : public MediaPlayerBackendBase
 {
-}
+public:
+    DefaultMediaPlayerBackend(Nix::MediaPlayerClient *client);
+    virtual ~DefaultMediaPlayerBackend();
+
+    virtual void load(const char* url) override;
+
+protected:
+    virtual bool createAudioSink() override;
+    virtual void destroyAudioSink() override;
+    virtual void handleMessage(GstMessage *message);
+
+private:
+    void setDownloadBuffering();
+    void updateStates();
+};
+
+#endif // DefaultMediaPlayerBackend_h

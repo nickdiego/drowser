@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2012 Collabora Ltd. All rights reserved.
+ * Copyright (C) 2013 Igalia S.L. All rights reserved.
  * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,27 +25,49 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GstreamerBackend_h
-#define GstreamerBackend_h
+#ifndef MediaStreamPlayerBackend_h
+#define MediaStreamPlayerBackend_h
 
-#include "GstreamerBackendBase.h"
+#include "MediaPlayerBackendBase.h"
 
-class GstreamerBackend : public GstreamerBackendBase
+#include <NixPlatform/MediaStream.h>
+#include <NixPlatform/MediaStreamSource.h>
+
+#include <string>
+
+class MediaStreamPlayerBackend : public MediaPlayerBackendBase, private Nix::MediaStreamSource::Observer
 {
 public:
-    GstreamerBackend(Nix::MediaPlayerClient *client);
-    virtual ~GstreamerBackend();
+    MediaStreamPlayerBackend(Nix::MediaPlayerClient *client);
+    virtual ~MediaStreamPlayerBackend();
 
+    // MediaPlayerBackendBase methods
     virtual void load(const char* url) override;
+    virtual void play() override;
+    virtual void pause() override;
+
+    // Nix::MediaStreamSource::Observer methods
+    virtual void sourceReadyStateChanged() override;
+    virtual void sourceMutedChanged() override;
+    virtual void sourceEnabledChanged() override;
 
 protected:
     virtual bool createAudioSink() override;
     virtual void destroyAudioSink() override;
-    virtual void handleMessage(GstMessage *message);
+    virtual void handleMessage(GstMessage *message) override;
+    void stop();
+    bool stopped();
+
+
+    bool internalLoad();
+    bool connectToGSTLiveStream(Nix::MediaStream* stream);
 
 private:
+    Nix::MediaStream* m_stream;
+    std::string m_audioSourceId;
+    bool m_stopped;
+
     void setDownloadBuffering();
-    void updateStates();
 };
 
-#endif // GstreamerBackend_h
+#endif // MediaStreamPlayerBackend_h
