@@ -37,7 +37,9 @@
 MediaStreamPlayerBackend::MediaStreamPlayerBackend(Nix::MediaPlayerClient* client, Nix::MediaStream* stream)
     : MediaPlayerBackendBase(client, true)
     , m_stream(stream)
-    , m_stopped(false)
+    , m_audioSourceId()
+    , m_audioSinkBin(nullptr)
+    , m_stopped(true)
 {
 }
 
@@ -66,6 +68,7 @@ bool MediaStreamPlayerBackend::createAudioSink()
     GstPad* pad = gst_element_get_static_pad(volume, "sink");
     gst_element_add_pad(m_audioSinkBin, gst_ghost_pad_new("sink", pad));
 
+    LOG(Media, "created sink bin %p", m_audioSinkBin);
     return true;
 }
 
@@ -81,22 +84,30 @@ void MediaStreamPlayerBackend::load()
 {
     gst_init_check(0, 0, 0);
 
+    LOG(Media, "loading..");
+
     if (!m_audioSinkBin && !createAudioSink()) {
         // Could be a decode error as well, but just report a error is enough for now.
         setNetworkState(Nix::MediaPlayerClient::NetworkError);
         return;
     }
 
+    LOG(Media, "playbin ok..");
+
     if (!m_stream || m_stream->ended()) {
         loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return;
     }
+
+    LOG(Media, "stream not ended..");
 
     setReadyState(Nix::MediaPlayerClient::HaveNothing);
     setNetworkState(Nix::MediaPlayerClient::Loading);
 
     if (!internalLoad())
         return;
+
+    LOG(Media, "internal load ok..");
 }
 
 void MediaStreamPlayerBackend::setDownloadBuffering()
@@ -168,6 +179,17 @@ void MediaStreamPlayerBackend::stop()
     m_audioSourceId = "";
 }
 
+void MediaStreamPlayerBackend::setMediaStream(Nix::MediaStream* stream)
+{
+    assert(stream);
+    if (m_stream && m_stream == stream)
+        return;
+
+    // FIXME: Incomplete implementation
+    // handle when some stream was already playing..
+    m_stream = stream;
+}
+
 void MediaStreamPlayerBackend::play()
 {
     LOG(Media, "Play");
@@ -193,11 +215,15 @@ bool MediaStreamPlayerBackend::internalLoad()
     if (!m_stopped)
         return false;
 
+    LOG(Media, " currently stopped");
+
     m_stopped = false;
     if (!m_stream || m_stream->ended()) {
         loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return false;
     }
+
+    LOG(Media, " let's connect to medistream pipeline");
     return connectToGSTLiveStream(m_stream);
 }
 

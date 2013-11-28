@@ -48,7 +48,7 @@ public:
     // MediaPlayerBackendBase
     virtual GstElement* pipeline() const override;
 
-    void setURL(const std::string& url) { /* FIXME */ }
+    void setURL(const std::string& url);
 
 protected:
     virtual bool createAudioSink() override;

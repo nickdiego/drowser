@@ -61,7 +61,7 @@ public:
     virtual void sourceEnabledChanged() override;
     virtual bool observerIsEnabled() override;
 
-    void setMediaStream(Nix::MediaStream* stream) { /* FIXME */ }
+    void setMediaStream(Nix::MediaStream* stream);
 
 protected:
     virtual bool createAudioSink() override;

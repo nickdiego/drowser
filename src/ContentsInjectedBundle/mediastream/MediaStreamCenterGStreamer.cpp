@@ -214,6 +214,7 @@ std::string MediaStreamCenterGStreamer::storeElementFactoryForElement(GstElement
 
 GstElementFactory* MediaStreamCenterGStreamer::storedElementFactory(const string& key)
 {
+    LOG(Media, "find factory '%s'", key.c_str());
     GstElementFactory* elementFactory = 0;
     ElementFactoryMap::iterator elementFactoryIt = m_elementFactoryMap.find(key);
     if (elementFactoryIt != m_elementFactoryMap.end())
@@ -276,7 +277,7 @@ GstElement* MediaStreamCenterGStreamer::createSource(const string& sourceId, Gst
 Nix::MediaStreamSource* MediaStreamCenterGStreamer::firstSource(Nix::MediaStreamSource::Type type)
 {
     for (auto iter = m_sourceMap.begin(); iter != m_sourceMap.end(); ++iter) {
-        LOG(Media, "findSource xxx");
+        LOG(Media, "firstSource");
         Nix::MediaStreamSource* source = iter->second;
         if (source->type() == type)
             return source;

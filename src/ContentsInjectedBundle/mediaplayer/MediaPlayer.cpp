@@ -139,6 +139,7 @@ bool MediaPlayer::isLiveStream() const
 
 void MediaPlayer::setSrc(const char* url)
 {
+    LOG(Media, "Setting URL '%s' as source.", url);
     std::string urlString(g_strdup(url)); // FIXME g_strdub
     if (m_backend) {
         DefaultMediaPlayerBackend* defaultBackend = dynamic_cast<DefaultMediaPlayerBackend*>(m_backend);
@@ -153,6 +154,7 @@ void MediaPlayer::setSrc(const char* url)
 
 void MediaPlayer::setSrc(Nix::MediaStream* mediaStream)
 {
+    LOG(Media, "Setting MediaStream %p as source.", mediaStream);
     if (m_backend) {
         MediaStreamPlayerBackend* streamBackend = dynamic_cast<MediaStreamPlayerBackend*>(m_backend);
         if (streamBackend) {
@@ -171,6 +173,5 @@ void MediaPlayer::load()
         return;
     }
 
-    LOG(Media, "Load");
     m_backend->load();
 }

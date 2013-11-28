@@ -51,6 +51,16 @@ GstElement* DefaultMediaPlayerBackend::pipeline() const
     return m_audioSink;
 }
 
+void DefaultMediaPlayerBackend::setURL(const std::string& url)
+{
+    if (m_url == url)
+        return;
+
+    // FIXME: Incomplete implementation
+    // handle when some other url was already playing..
+    m_url = url;
+}
+
 /* MediaPlayerBackend */
 float DefaultMediaPlayerBackend::duration() const
 {
