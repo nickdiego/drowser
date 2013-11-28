@@ -38,14 +38,13 @@
 class MediaStreamPlayerBackend : public MediaPlayerBackendBase, private Nix::MediaStreamSource::Observer
 {
 public:
-    MediaStreamPlayerBackend(Nix::MediaPlayerClient *client);
+    MediaStreamPlayerBackend(Nix::MediaPlayerClient *client, Nix::MediaStream* stream);
     virtual ~MediaStreamPlayerBackend();
 
     // MediaPlayerBackendBase methods
-    virtual void load(const char* url) override;
+    virtual void load() override;
     virtual void play() override;
     virtual void pause() override;
-
     virtual float duration() const override { return 0; }
     virtual float currentTime() const override { return 0; }
     virtual void seek(float) override { }
@@ -60,6 +59,10 @@ public:
     virtual void sourceReadyStateChanged() override;
     virtual void sourceMutedChanged() override;
     virtual void sourceEnabledChanged() override;
+    virtual bool observerIsEnabled() override;
+
+    void setMediaStream(Nix::MediaStream* stream) { /* FIXME */ }
+
 protected:
     virtual bool createAudioSink() override;
     virtual void destroyAudioSink() override;

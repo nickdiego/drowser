@@ -34,6 +34,7 @@ public:
     MediaPlayerBackend(Nix::MediaPlayerClient* client): m_playerClient(client) { }
     virtual ~MediaPlayerBackend() { }
 
+    virtual void load() = 0;
     virtual void play() = 0;
     virtual void pause() = 0;
     virtual void seek(float) = 0;
@@ -41,7 +42,6 @@ public:
     virtual float currentTime() const = 0;
     virtual void setVolume(float) = 0;
     virtual void setMuted(bool) = 0;
-    virtual void load(const char* url) = 0;
     virtual bool seeking() const = 0;
     virtual float maxTimeSeekable() const = 0;
     virtual void setPlaybackRate(float) = 0;

@@ -34,8 +34,9 @@
 #include <cstdio>
 #include <limits>
 
-MediaStreamPlayerBackend::MediaStreamPlayerBackend(Nix::MediaPlayerClient* client)
+MediaStreamPlayerBackend::MediaStreamPlayerBackend(Nix::MediaPlayerClient* client, Nix::MediaStream* stream)
     : MediaPlayerBackendBase(client, true)
+    , m_stream(stream)
     , m_stopped(false)
 {
 }
@@ -76,7 +77,7 @@ void MediaStreamPlayerBackend::destroyAudioSink()
     gst_object_unref(m_audioSinkBin);
 }
 
-void MediaStreamPlayerBackend::load(const char* url)
+void MediaStreamPlayerBackend::load()
 {
     gst_init_check(0, 0, 0);
 
@@ -86,7 +87,7 @@ void MediaStreamPlayerBackend::load(const char* url)
         return;
     }
 
-    if (!m_stream /*|| m_stream->ended()*/) { // FIXME
+    if (!m_stream || m_stream->ended()) {
         loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return;
     }
@@ -111,6 +112,8 @@ void MediaStreamPlayerBackend::setDownloadBuffering()
         g_object_set(m_audioSinkBin, "flags", flags | GST_PLAY_FLAG_DOWNLOAD, NULL);
 }
 
+
+/* Nix::MediaStreamSource::Observer methods */
 void MediaStreamPlayerBackend::sourceReadyStateChanged()
 {
     CentralPipelineUnit& cpu = CentralPipelineUnit::instance();
@@ -140,6 +143,14 @@ void MediaStreamPlayerBackend::sourceEnabledChanged()
 {
 }
 
+// FIXME implement
+bool MediaStreamPlayerBackend::observerIsEnabled()
+{
+    return true;
+}
+/**/
+
+
 bool MediaStreamPlayerBackend::stopped()
 {
     return m_stopped;
@@ -160,7 +171,7 @@ void MediaStreamPlayerBackend::stop()
 void MediaStreamPlayerBackend::play()
 {
     LOG(Media, "Play");
-    if (!m_stream/* || m_streamDescriptor->ended()*/) { //FIXME
+    if (!m_stream || m_stream->ended()) {
         m_readyState = Nix::MediaPlayerClient::HaveNothing;
         loadingFailed(Nix::MediaPlayerClient::Empty);
         return;
@@ -183,7 +194,7 @@ bool MediaStreamPlayerBackend::internalLoad()
         return false;
 
     m_stopped = false;
-    if (!m_stream/* || m_stream->ended()*/) { //FIXME
+    if (!m_stream || m_stream->ended()) {
         loadingFailed(Nix::MediaPlayerClient::NetworkError);
         return false;
     }

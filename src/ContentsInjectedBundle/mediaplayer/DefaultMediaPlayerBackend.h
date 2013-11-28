@@ -28,14 +28,16 @@
 
 #include "MediaPlayerBackendBase.h"
 
+#include <string>
+
 class DefaultMediaPlayerBackend : public MediaPlayerBackendBase
 {
 public:
-    DefaultMediaPlayerBackend(Nix::MediaPlayerClient *client);
+    DefaultMediaPlayerBackend(Nix::MediaPlayerClient *client, const std::string& url);
     virtual ~DefaultMediaPlayerBackend();
 
     // MediaPlayerBackend
-    virtual void load(const char* url) override;
+    virtual void load() override;
     virtual float duration() const override;
     virtual float currentTime() const override;
     virtual void seek(float) override;
@@ -46,6 +48,8 @@ public:
     // MediaPlayerBackendBase
     virtual GstElement* pipeline() const override;
 
+    void setURL(const std::string& url) { /* FIXME */ }
+
 protected:
     virtual bool createAudioSink() override;
     virtual void destroyAudioSink() override;
@@ -55,6 +59,7 @@ private:
     void setDownloadBuffering();
     void updateStates();
 
+    std::string m_url;
     GstElement* m_audioSink;
     bool m_seeking;
     bool m_pendingSeek;

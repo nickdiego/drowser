@@ -25,9 +25,13 @@
 
 #include "MediaPlayer.h"
 
+#include <NixPlatform/MediaStream.h>
+
 #include "BrowserPlatform.h"
 #include "DefaultMediaPlayerBackend.h"
-#include "MediaPlayerBackend.h"
+#include "MediaStreamPlayerBackend.h"
+
+#include "Logging.h"
 
 Nix::MediaPlayer* BrowserPlatform::createMediaPlayer(Nix::MediaPlayerClient* client)
 {
@@ -133,20 +137,40 @@ bool MediaPlayer::isLiveStream() const
     return m_backend->isLiveStream();
 }
 
-void MediaPlayer::load(const char* url)
+void MediaPlayer::setSrc(const char* url)
 {
-    selectMediaBackend();
-
-    if (!m_backend)
-        return;
-    m_backend->load(url);
+    std::string urlString(g_strdup(url)); // FIXME g_strdub
+    if (m_backend) {
+        DefaultMediaPlayerBackend* defaultBackend = dynamic_cast<DefaultMediaPlayerBackend*>(m_backend);
+        if (defaultBackend) {
+            defaultBackend->setURL(urlString);
+            return;
+        }
+        delete m_backend;
+    }
+    m_backend = new DefaultMediaPlayerBackend(m_playerClient, urlString);
 }
 
-void MediaPlayer::selectMediaBackend()
+void MediaPlayer::setSrc(Nix::MediaStream* mediaStream)
 {
-    if (m_backend)
+    if (m_backend) {
+        MediaStreamPlayerBackend* streamBackend = dynamic_cast<MediaStreamPlayerBackend*>(m_backend);
+        if (streamBackend) {
+            streamBackend->setMediaStream(mediaStream);
+            return;
+        }
         delete m_backend;
+    }
+    m_backend = new MediaStreamPlayerBackend(m_playerClient, mediaStream);
+}
 
-    // FIXME: create StreamGstreamerBackend
-    m_backend = new DefaultMediaPlayerBackend(m_playerClient);
+void MediaPlayer::load()
+{
+    if (!m_backend) {
+        LOG(Media, "No 'src' set.");
+        return;
+    }
+
+    LOG(Media, "Load");
+    m_backend->load();
 }

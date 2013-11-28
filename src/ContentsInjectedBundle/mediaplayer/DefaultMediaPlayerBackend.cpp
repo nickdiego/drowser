@@ -30,8 +30,9 @@
 #include <cstdio>
 #include <limits>
 
-DefaultMediaPlayerBackend::DefaultMediaPlayerBackend(Nix::MediaPlayerClient* client)
+DefaultMediaPlayerBackend::DefaultMediaPlayerBackend(Nix::MediaPlayerClient* client, const std::string& url)
     : MediaPlayerBackendBase(client)
+    , m_url(url)
     , m_audioSink(nullptr)
     , m_seeking(false)
     , m_pendingSeek(false)
@@ -169,7 +170,7 @@ void DefaultMediaPlayerBackend::destroyAudioSink()
     gst_object_unref(m_audioSink);
 }
 
-void DefaultMediaPlayerBackend::load(const char* url)
+void DefaultMediaPlayerBackend::load()
 {
     gst_init_check(0, 0, 0);
 
@@ -179,7 +180,7 @@ void DefaultMediaPlayerBackend::load(const char* url)
         return;
     }
 
-    g_object_set(m_audioSink, "uri", url, NULL);
+    g_object_set(m_audioSink, "uri", m_url.c_str(), NULL);
 
     gst_element_set_state(m_audioSink, GST_STATE_PAUSED);
     setDownloadBuffering();
