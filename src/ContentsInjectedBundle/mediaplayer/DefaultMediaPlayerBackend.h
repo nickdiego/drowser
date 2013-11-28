@@ -34,7 +34,17 @@ public:
     DefaultMediaPlayerBackend(Nix::MediaPlayerClient *client);
     virtual ~DefaultMediaPlayerBackend();
 
+    // MediaPlayerBackend
     virtual void load(const char* url) override;
+    virtual float duration() const override;
+    virtual float currentTime() const override;
+    virtual void seek(float) override;
+    virtual bool seeking() const override;
+    virtual float maxTimeSeekable() const override;
+    virtual void setPlaybackRate(float) override;
+
+    // MediaPlayerBackendBase
+    virtual GstElement* pipeline() const override;
 
 protected:
     virtual bool createAudioSink() override;
@@ -44,6 +54,13 @@ protected:
 private:
     void setDownloadBuffering();
     void updateStates();
+
+    GstElement* m_audioSink;
+    bool m_seeking;
+    bool m_pendingSeek;
+    bool m_bufferingFinished;
+    float m_playbackRate;
+    float m_seekTime;
 };
 
 #endif // DefaultMediaPlayerBackend_h

@@ -27,6 +27,7 @@
 
 #include "MediaStreamPlayerBackend.h"
 #include "CentralPipelineUnit.h"
+#include "Logging.h"
 
 #include <cassert>
 #include <cmath>
@@ -34,7 +35,7 @@
 #include <limits>
 
 MediaStreamPlayerBackend::MediaStreamPlayerBackend(Nix::MediaPlayerClient* client)
-    : MediaPlayerBackendBase(client)
+    : MediaPlayerBackendBase(client, true)
     , m_stopped(false)
 {
 }
@@ -44,37 +45,42 @@ MediaStreamPlayerBackend::~MediaStreamPlayerBackend()
     destroyAudioSink();
 }
 
+GstElement* MediaStreamPlayerBackend::pipeline() const
+{
+    return CentralPipelineUnit::instance().pipeline();
+}
+
 bool MediaStreamPlayerBackend::createAudioSink()
 {
     // FIXME: check errors
-    assert(!m_audioSink);
-    m_audioSink = gst_bin_new(0);
+    assert(!m_audioSinkBin);
+    m_audioSinkBin = gst_bin_new(0);
 
     GstElement* volume = gst_element_factory_make("volume", "volume");
 
     GstElement* audioSink = gst_element_factory_make("autoaudiosink", 0);
-    gst_bin_add_many(GST_BIN(m_audioSink), volume, audioSink, NULL);
+    gst_bin_add_many(GST_BIN(m_audioSinkBin), volume, audioSink, NULL);
     gst_element_link_many(volume, audioSink, NULL);
 
     GstPad* pad = gst_element_get_static_pad(volume, "sink");
-    gst_element_add_pad(m_audioSink, gst_ghost_pad_new("sink", pad));
+    gst_element_add_pad(m_audioSinkBin, gst_ghost_pad_new("sink", pad));
 
     return true;
 }
 
 void MediaStreamPlayerBackend::destroyAudioSink()
 {
-    if (!m_audioSink)
+    if (!m_audioSinkBin)
         return;
-    gst_element_set_state(m_audioSink, GST_STATE_NULL);
-    gst_object_unref(m_audioSink);
+    gst_element_set_state(m_audioSinkBin, GST_STATE_NULL);
+    gst_object_unref(m_audioSinkBin);
 }
 
 void MediaStreamPlayerBackend::load(const char* url)
 {
     gst_init_check(0, 0, 0);
 
-    if (!m_audioSink && !createAudioSink()) {
+    if (!m_audioSinkBin && !createAudioSink()) {
         // Could be a decode error as well, but just report a error is enough for now.
         setNetworkState(Nix::MediaPlayerClient::NetworkError);
         return;
@@ -92,48 +98,44 @@ void MediaStreamPlayerBackend::load(const char* url)
         return;
 }
 
-void MediaStreamPlayerBackend::handleMessage(GstMessage* message)
-{
-}
-
 void MediaStreamPlayerBackend::setDownloadBuffering()
 {
-    assert(m_audioSink);
+    assert(m_audioSinkBin);
 
     GstPlayFlags flags;
-    g_object_get(m_audioSink, "flags", &flags, NULL);
+    g_object_get(m_audioSinkBin, "flags", &flags, NULL);
     // TODO add support for "auto" downloading...
     if (m_isLive)
-        g_object_set(m_audioSink, "flags", flags & ~GST_PLAY_FLAG_DOWNLOAD, NULL);
+        g_object_set(m_audioSinkBin, "flags", flags & ~GST_PLAY_FLAG_DOWNLOAD, NULL);
     else
-        g_object_set(m_audioSink, "flags", flags | GST_PLAY_FLAG_DOWNLOAD, NULL);
+        g_object_set(m_audioSinkBin, "flags", flags | GST_PLAY_FLAG_DOWNLOAD, NULL);
 }
 
 void MediaStreamPlayerBackend::sourceReadyStateChanged()
 {
     CentralPipelineUnit& cpu = CentralPipelineUnit::instance();
-    if (!m_stream|| m_stream->ended())
+    if (!m_stream || m_stream->ended())
         stop();
 
-#if 0 //FIXME export MediaStreamTracks
     // check if the source should be ended
     if (!m_audioSourceId.empty()) {
-        for (unsigned i = 0; i < m_stream->numberOfAudioStreams(); i++) {
-            Nix::MediaStreamSource* source = m_stream->audioStreams(i);
+        std::vector<Nix::MediaStreamSource*> audioSources = m_stream->audioSources();
+        for (auto& source: audioSources) {
             if (!source->enabled() && m_audioSourceId.compare(source->id()) == 0) {
-                cpu.disconnectFromSource(m_audioSourceId, m_audioSink);
+                cpu.disconnectFromSource(m_audioSourceId, m_audioSinkBin);
                 m_audioSourceId = "";
                 break;
             }
         }
     }
-#endif
 }
 
+// FIXME implement
 void MediaStreamPlayerBackend::sourceMutedChanged()
 {
 }
 
+// FIXME implement
 void MediaStreamPlayerBackend::sourceEnabledChanged()
 {
 }
@@ -151,12 +153,13 @@ void MediaStreamPlayerBackend::stop()
     m_stopped = true;
     CentralPipelineUnit& cpu = CentralPipelineUnit::instance();
     if (!m_audioSourceId.empty())
-        cpu.disconnectFromSource(m_audioSourceId, m_audioSink);
+        cpu.disconnectFromSource(m_audioSourceId, m_audioSinkBin);
     m_audioSourceId = "";
 }
 
 void MediaStreamPlayerBackend::play()
 {
+    LOG(Media, "Play");
     if (!m_stream/* || m_streamDescriptor->ended()*/) { //FIXME
         m_readyState = Nix::MediaPlayerClient::HaveNothing;
         loadingFailed(Nix::MediaPlayerClient::Empty);
@@ -169,6 +172,7 @@ void MediaStreamPlayerBackend::play()
 
 void MediaStreamPlayerBackend::pause()
 {
+    LOG(Media, "Pause");
     m_paused = true;
     stop();
 }
@@ -186,13 +190,41 @@ bool MediaStreamPlayerBackend::internalLoad()
     return connectToGSTLiveStream(m_stream);
 }
 
-// FIXME implement
-bool MediaStreamPlayerBackend::connectToGSTLiveStream(Nix::MediaStream* streamDescriptor)
+bool MediaStreamPlayerBackend::connectToGSTLiveStream(Nix::MediaStream* mediaStream)
 {
+    LOG(Media, "Connecting to live stream, descriptor: %p", mediaStream);
+    if (!mediaStream)
+        return false;
+
+    // FIXME: Error handling.. this could fail.. and this method never returns false.
+
+    CentralPipelineUnit& cpu = CentralPipelineUnit::instance();
+
+    if (!m_audioSourceId.empty()) {
+        cpu.disconnectFromSource(m_audioSourceId, m_audioSinkBin);
+        m_audioSourceId = "";
+    }
+
+    std::vector<Nix::MediaStreamSource*> audioSources = mediaStream->audioSources();
+    LOG(Media, "Stream descriptor has %lu audio streams.", audioSources.size());
+    for (auto& source: audioSources) {
+        if (!source->enabled())
+            continue;
+        if (source->type() == Nix::MediaStreamSource::Audio) {
+            if (cpu.connectToSource(source->id(), m_audioSinkBin)) {
+                m_audioSourceId = source->id();
+                source->addObserver(this);
+                break;
+            }
+        }
+    }
+
     return true;
 }
 
-// FIXME implement
 void MediaStreamPlayerBackend::loadingFailed(Nix::MediaPlayerClient::NetworkState networkState)
 {
+    setNetworkState(networkState);
+    setReadyState(Nix::MediaPlayerClient::HaveNothing);
 }
+

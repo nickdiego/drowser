@@ -27,6 +27,7 @@
 #define MediaStreamCenterGStreamer_h
 
 #include "SourceFactory.h"
+#include "Logging.h"
 
 #include <NixPlatform/MediaStreamAudioSource.h>
 
@@ -43,13 +44,13 @@ MediaStreamSourceGStreamer(const std::string& id, const std::string& name, const
     , m_factoryKey(factoryKey)
     , m_device(device)
     {
-        LOG_MEDIA_MESSAGE("'%s' '%s'", m_factoryKey.c_str(), m_device.c_str());
-        LOG_MEDIA_MESSAGE("id '%s'", this->id());
+        LOG(Media, "'%s' '%s'", m_factoryKey.c_str(), m_device.c_str());
+        LOG(Media, "id '%s'", this->id());
     }
 
     virtual ~MediaStreamSourceGStreamer()
     {
-        LOG_MEDIA_MESSAGE("%p", this);
+        LOG(Media, "%p", this);
     }
 
     const std::string& factoryKey() const { return m_factoryKey; }

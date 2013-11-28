@@ -51,35 +51,25 @@ typedef enum {
 class MediaPlayerBackendBase : public MediaPlayerBackend
 {
 public:
-    MediaPlayerBackendBase(Nix::MediaPlayerClient* client);
+    MediaPlayerBackendBase(Nix::MediaPlayerClient* client, bool isLive = false);
     virtual ~MediaPlayerBackendBase();
 
     // MediaPlayerBackend methods
     virtual void play() override;
     virtual void pause() override;
-    virtual void seek(float) override;
-    virtual float duration() const override;
-    virtual float currentTime() const override;
     virtual void setVolume(float) override;
     virtual void setMuted(bool) override;
-    virtual bool seeking() const override;
-    virtual float maxTimeSeekable() const override;
-    virtual void setPlaybackRate(float) override;
     virtual bool isLiveStream() const override;
     virtual bool isPaused() const override;
 
+    virtual GstElement* pipeline() const = 0;
     virtual void setReadyState(Nix::MediaPlayerClient::ReadyState readyState);
     virtual void setNetworkState(Nix::MediaPlayerClient::NetworkState readyState);
 
 protected:
-    GstElement* m_audioSink;
     bool m_paused;
     bool m_isLive;
-    bool m_seeking;
-    bool m_pendingSeek;
-    bool m_bufferingFinished;
-    float m_playbackRate;
-    float m_seekTime;
+
     Nix::MediaPlayerClient::ReadyState m_readyState;
     Nix::MediaPlayerClient::NetworkState m_networkState;
 

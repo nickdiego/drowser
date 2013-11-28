@@ -46,15 +46,23 @@ public:
     virtual void play() override;
     virtual void pause() override;
 
+    virtual float duration() const override { return 0; }
+    virtual float currentTime() const override { return 0; }
+    virtual void seek(float) override { }
+    virtual bool seeking() const override { return false; }
+    virtual float maxTimeSeekable() const override { return 0; }
+    virtual void setPlaybackRate(float) override { }
+
+    // MediaPlayerBackendBase
+    virtual GstElement* pipeline() const override;
+
     // Nix::MediaStreamSource::Observer methods
     virtual void sourceReadyStateChanged() override;
     virtual void sourceMutedChanged() override;
     virtual void sourceEnabledChanged() override;
-
 protected:
     virtual bool createAudioSink() override;
     virtual void destroyAudioSink() override;
-    virtual void handleMessage(GstMessage *message) override;
     void stop();
     bool stopped();
 
@@ -65,6 +73,7 @@ protected:
 private:
     Nix::MediaStream* m_stream;
     std::string m_audioSourceId;
+    GstElement* m_audioSinkBin;
     bool m_stopped;
 
     void setDownloadBuffering();

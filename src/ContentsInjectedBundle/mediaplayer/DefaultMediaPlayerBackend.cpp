@@ -32,6 +32,11 @@
 
 DefaultMediaPlayerBackend::DefaultMediaPlayerBackend(Nix::MediaPlayerClient* client)
     : MediaPlayerBackendBase(client)
+    , m_audioSink(nullptr)
+    , m_seeking(false)
+    , m_pendingSeek(false)
+    , m_bufferingFinished(false)
+    , m_playbackRate(1)
 {
 }
 
@@ -39,6 +44,80 @@ DefaultMediaPlayerBackend::~DefaultMediaPlayerBackend()
 {
     destroyAudioSink();
 }
+
+GstElement* DefaultMediaPlayerBackend::pipeline() const
+{
+    return m_audioSink;
+}
+
+/* MediaPlayerBackend */
+float DefaultMediaPlayerBackend::duration() const
+{
+    gint64 duration = GST_CLOCK_TIME_NONE;
+    gst_element_query_duration(m_audioSink, GST_FORMAT_TIME, &duration);
+    if (GST_CLOCK_TIME_IS_VALID(duration))
+        return static_cast<double>(duration) / GST_SECOND;
+    return 0;
+}
+
+float DefaultMediaPlayerBackend::currentTime() const
+{
+    gint64 current = GST_CLOCK_TIME_NONE;
+    gst_element_query_position(m_audioSink, GST_FORMAT_TIME, &current);
+    if (GST_CLOCK_TIME_IS_VALID(current))
+        return static_cast<double>(current) / GST_SECOND;
+    return 0;
+}
+
+void DefaultMediaPlayerBackend::seek(float time)
+{
+    if (!m_audioSink)
+        return;
+
+    m_seekTime = time;
+
+    if (m_seeking) {
+        m_pendingSeek = true;
+        return;
+    }
+
+    GstState state;
+    gst_element_get_state(m_audioSink, &state, 0, 0);
+    if (state != GST_STATE_PAUSED && state != GST_STATE_PLAYING)
+        return;
+
+    float seconds;
+    float microSeconds = modff(time, &seconds) * 1000000;
+    GTimeVal timeValue;
+    timeValue.tv_sec = static_cast<glong>(seconds);
+    timeValue.tv_usec = static_cast<glong>(roundf(microSeconds / 10000) * 10000);
+
+    if (!gst_element_seek(m_audioSink, m_playbackRate, GST_FORMAT_TIME, static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_ACCURATE),
+                          GST_SEEK_TYPE_SET, GST_TIMEVAL_TO_TIME(timeValue), GST_SEEK_TYPE_NONE, GST_CLOCK_TIME_NONE)) {
+        return;
+    }
+
+    m_seeking = true;
+}
+
+bool DefaultMediaPlayerBackend::seeking() const
+{
+    return m_seeking;
+}
+
+float DefaultMediaPlayerBackend::maxTimeSeekable() const
+{
+    if (m_isLive)
+        return std::numeric_limits<float>::infinity();
+
+    return duration();
+}
+
+void DefaultMediaPlayerBackend::setPlaybackRate(float playbackRate)
+{
+    m_playbackRate = playbackRate;
+}
+/**/
 
 bool DefaultMediaPlayerBackend::createAudioSink()
 {

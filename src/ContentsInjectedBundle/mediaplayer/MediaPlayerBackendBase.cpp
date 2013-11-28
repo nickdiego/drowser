@@ -26,22 +26,11 @@
 #include "MediaPlayerBackendBase.h"
 
 #include <gst/audio/streamvolume.h>
-#include <cassert>
-#include <cmath>
-#include <cstdio>
-#include <limits>
 
-using namespace std;
-
-MediaPlayerBackendBase::MediaPlayerBackendBase(Nix::MediaPlayerClient* client)
+MediaPlayerBackendBase::MediaPlayerBackendBase(Nix::MediaPlayerClient* client, bool isLive)
     : MediaPlayerBackend(client)
-    , m_audioSink(nullptr)
     , m_paused(true)
-    , m_isLive(false)
-    , m_seeking(false)
-    , m_pendingSeek(false)
-    , m_bufferingFinished(false)
-    , m_playbackRate(1)
+    , m_isLive(isLive)
     , m_readyState(Nix::MediaPlayerClient::HaveNothing)
     , m_networkState(Nix::MediaPlayerClient::Empty)
 {
@@ -53,91 +42,24 @@ MediaPlayerBackendBase::~MediaPlayerBackendBase()
 
 void MediaPlayerBackendBase::play()
 {
-    gst_element_set_state(m_audioSink, GST_STATE_PLAYING);
+    gst_element_set_state(pipeline(), GST_STATE_PLAYING);
     m_paused = false;
 }
 
 void MediaPlayerBackendBase::pause()
 {
-    gst_element_set_state(m_audioSink, GST_STATE_PAUSED);
+    gst_element_set_state(pipeline(), GST_STATE_PAUSED);
     m_paused = true;
-}
-
-float MediaPlayerBackendBase::duration() const
-{
-    gint64 duration = GST_CLOCK_TIME_NONE;
-    gst_element_query_duration(m_audioSink, GST_FORMAT_TIME, &duration);
-    if (GST_CLOCK_TIME_IS_VALID(duration))
-        return static_cast<double>(duration) / GST_SECOND;
-    return 0;
-}
-
-float MediaPlayerBackendBase::currentTime() const
-{
-    gint64 current = GST_CLOCK_TIME_NONE;
-    gst_element_query_position(m_audioSink, GST_FORMAT_TIME, &current);
-    if (GST_CLOCK_TIME_IS_VALID(current))
-        return static_cast<double>(current) / GST_SECOND;
-    return 0;
-}
-
-void MediaPlayerBackendBase::seek(float time)
-{
-    if (!m_audioSink)
-        return;
-
-    m_seekTime = time;
-
-    if (m_seeking) {
-        m_pendingSeek = true;
-        return;
-    }
-
-    GstState state;
-    gst_element_get_state(m_audioSink, &state, 0, 0);
-    if (state != GST_STATE_PAUSED && state != GST_STATE_PLAYING)
-        return;
-
-    float seconds;
-    float microSeconds = modff(time, &seconds) * 1000000;
-    GTimeVal timeValue;
-    timeValue.tv_sec = static_cast<glong>(seconds);
-    timeValue.tv_usec = static_cast<glong>(roundf(microSeconds / 10000) * 10000);
-
-    if (!gst_element_seek(m_audioSink, m_playbackRate, GST_FORMAT_TIME, static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_ACCURATE),
-                          GST_SEEK_TYPE_SET, GST_TIMEVAL_TO_TIME(timeValue), GST_SEEK_TYPE_NONE, GST_CLOCK_TIME_NONE)) {
-        return;
-    }
-
-    m_seeking = true;
-}
-
-bool MediaPlayerBackendBase::seeking() const
-{
-    return m_seeking;
-}
-
-float MediaPlayerBackendBase::maxTimeSeekable() const
-{
-    if (m_isLive)
-        return numeric_limits<float>::infinity();
-
-    return duration();
-}
-
-void MediaPlayerBackendBase::setPlaybackRate(float playbackRate)
-{
-    m_playbackRate = playbackRate;
 }
 
 void MediaPlayerBackendBase::setVolume(float volume)
 {
-    gst_stream_volume_set_volume(GST_STREAM_VOLUME(m_audioSink), GST_STREAM_VOLUME_FORMAT_LINEAR, volume);
+    gst_stream_volume_set_volume(GST_STREAM_VOLUME(pipeline()), GST_STREAM_VOLUME_FORMAT_LINEAR, volume);
 }
 
 void MediaPlayerBackendBase::setMuted(bool mute)
 {
-    gst_stream_volume_set_mute(GST_STREAM_VOLUME(m_audioSink), mute);
+    gst_stream_volume_set_mute(GST_STREAM_VOLUME(pipeline()), mute);
 }
 
 bool MediaPlayerBackendBase::isLiveStream() const

@@ -21,13 +21,6 @@
 
 #include <string>
 
-// FIXME move to another shared header file
-#define LOG_MEDIA_MESSAGE(...) { \
-    fprintf(stderr, "[MEDIA] %s - ", __PRETTY_FUNCTION__); \
-    fprintf(stderr, __VA_ARGS__); \
-    fprintf(stderr, "\n"); \
-}
-
 typedef struct _GstPad GstPad;
 typedef struct _GstElement GstElement;
 

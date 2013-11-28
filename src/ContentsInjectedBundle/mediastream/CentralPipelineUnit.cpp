@@ -18,6 +18,8 @@
  */
 
 #include "CentralPipelineUnit.h"
+
+#include "Logging.h"
 #include "SourceFactory.h"
 
 #include <gst/gst.h>
@@ -89,12 +91,12 @@ void CentralPipelineUnit::deregisterSourceFactory(const string& sourceId)
 
 bool CentralPipelineUnit::connectAndGetSourceElement(const string& sourceId, GstElement*& sourceElement, GstPad*& sourcePad)
 {
-    LOG_MEDIA_MESSAGE("Connecting to source element %s", sourceId.c_str());
+    LOG(Media, "Connecting to source element %s", sourceId.c_str());
 
     CentralPipelineUnit::PipelineMap::iterator sourceIterator = m_pipelineMap.find(sourceId);
     if (sourceIterator != m_pipelineMap.end()) {
         Source& source = sourceIterator->second;
-        LOG_MEDIA_MESSAGE("Source element %s already in pipeline, using it.", sourceId.c_str());
+        LOG(Media, "Source element %s already in pipeline, using it.", sourceId.c_str());
         sourceElement = source.m_sourceElement;
         sourcePad = source.m_sourcePad;
         return true;
@@ -102,21 +104,21 @@ bool CentralPipelineUnit::connectAndGetSourceElement(const string& sourceId, Gst
 
     CentralPipelineUnit::SourceFactoryMap::iterator sourceFactoryIterator = m_sourceFactoryMap.find(sourceId);
     if (sourceFactoryIterator != m_sourceFactoryMap.end()) {
-        LOG_MEDIA_MESSAGE("Found a SourceFactory. Creating source element %s", sourceId.c_str());
+        LOG(Media, "Found a SourceFactory. Creating source element %s", sourceId.c_str());
         SourceFactory* sourceFactory = sourceFactoryIterator->second;
         sourceElement = sourceFactory->createSource(sourceId, sourcePad);
         if (!sourceElement) {
-            LOG_MEDIA_MESSAGE("ERROR, unable to create source element");
+            LOG(Media, "ERROR, unable to create source element");
             return false;
         }
 
         if (!sourcePad) {
-            LOG_MEDIA_MESSAGE("SourceFactory could not create a source pad, trying the element static \"src\" pad");
+            LOG(Media, "SourceFactory could not create a source pad, trying the element static \"src\" pad");
             sourcePad = gst_element_get_static_pad(sourceElement, "src");
         }
 
         if (!sourcePad) {
-            LOG_MEDIA_MESSAGE("ERROR, unable to retrieve element source pad");
+            LOG(Media, "ERROR, unable to retrieve element source pad");
             gst_object_unref(sourceElement);
             sourceElement = nullptr;
             return false;
@@ -124,7 +126,7 @@ bool CentralPipelineUnit::connectAndGetSourceElement(const string& sourceId, Gst
 
         GstElement* tee = gst_element_factory_make("tee", 0);
         if (!tee) {
-            LOG_MEDIA_MESSAGE("ERROR, Got no tee element");
+            LOG(Media, "ERROR, Got no tee element");
             gst_object_unref(sourceElement);
             gst_object_unref(sourcePad);
             sourceElement = nullptr;
@@ -146,18 +148,18 @@ bool CentralPipelineUnit::connectAndGetSourceElement(const string& sourceId, Gst
 bool CentralPipelineUnit::connectToSource(const string& sourceId, GstElement* sink, GstPad* sinkPad)
 {
     GstPad* refSinkPad = sinkPad;
-    LOG_MEDIA_MESSAGE("Connecting to source with id=%s, sink=%p, sinkpad=%p", sourceId.c_str(), sink, sinkPad);
+    LOG(Media, "Connecting to source with id=%s, sink=%p, sinkpad=%p", sourceId.c_str(), sink, sinkPad);
 
     if (!sink || sourceId.empty()) {
-        LOG_MEDIA_MESSAGE("ERROR, No sink provided or empty source id");
+        LOG(Media, "ERROR, No sink provided or empty source id");
         return false;
     }
 
     if (!refSinkPad) {
-        LOG_MEDIA_MESSAGE("No pad was given as argument, trying the element static \"sink\" pad.");
+        LOG(Media, "No pad was given as argument, trying the element static \"sink\" pad.");
         refSinkPad = gst_element_get_static_pad(sink, "sink");
         if (!refSinkPad) {
-            LOG_MEDIA_MESSAGE("ERROR, Unable to retrieve element sink pad");
+            LOG(Media, "ERROR, Unable to retrieve element sink pad");
             return false;
         }
     }
@@ -167,22 +169,22 @@ bool CentralPipelineUnit::connectToSource(const string& sourceId, GstElement* si
 
     bool haveSources = connectAndGetSourceElement(sourceId, sourceElement, sourcePad);
     if (!sourceElement) {
-        LOG_MEDIA_MESSAGE("ERROR, Unable to get source element");
+        LOG(Media, "ERROR, Unable to get source element");
         return false;
     }
 
     GstElement* queue = gst_element_factory_make("queue", 0);
     if (!queue) {
-        LOG_MEDIA_MESSAGE("ERROR, Got no queue element");
+        LOG(Media, "ERROR, Got no queue element");
         return false;
     }
 
     GstElement* sinkParent = GST_ELEMENT(gst_element_get_parent(sink));
     if (!sinkParent) {
-        LOG_MEDIA_MESSAGE("Sink not in pipeline, adding.");
+        LOG(Media, "Sink not in pipeline, adding.");
         gst_bin_add(GST_BIN(m_pipeline), sink);
     } else if (sinkParent != m_pipeline) {
-        LOG_MEDIA_MESSAGE("ERROR, Sink already added to another element. Pipeline is now broken!");
+        LOG(Media, "ERROR, Sink already added to another element. Pipeline is now broken!");
         return false;
     }
 
@@ -210,24 +212,24 @@ bool CentralPipelineUnit::connectToSource(const string& sourceId, GstElement* si
 bool CentralPipelineUnit::disconnectFromSource(const string& sourceId, GstElement* sink, GstPad* sinkPad)
 {
     GstPad* refSinkPad = sinkPad;
-    LOG_MEDIA_MESSAGE("Disconnecting from source with id=%s, sink=%p, sinkpad=%p", sourceId.c_str(), sink, sinkPad);
+    LOG(Media, "Disconnecting from source with id=%s, sink=%p, sinkpad=%p", sourceId.c_str(), sink, sinkPad);
 
     if (!sink || sourceId.empty()) {
-        LOG_MEDIA_MESSAGE("ERROR, No sink provided or empty source id");
+        LOG(Media, "ERROR, No sink provided or empty source id");
         return false;
     }
 
     PipelineMap::iterator sourceIterator = m_pipelineMap.find(sourceId);
     if (sourceIterator == m_pipelineMap.end()) {
-        LOG_MEDIA_MESSAGE("Could not find source with id=%s", sourceId.c_str());
+        LOG(Media, "Could not find source with id=%s", sourceId.c_str());
         return false;
     }
 
     if (!refSinkPad) {
-        LOG_MEDIA_MESSAGE("No pad was given as argument, trying the element static \"sink\" pad.");
+        LOG(Media, "No pad was given as argument, trying the element static \"sink\" pad.");
         refSinkPad = gst_element_get_static_pad(sink, "sink");
         if (!refSinkPad) {
-            LOG_MEDIA_MESSAGE("ERROR, Unable to retrieve element sink pad");
+            LOG(Media, "ERROR, Unable to retrieve element sink pad");
             return false;
         }
     }
@@ -257,7 +259,7 @@ void CentralPipelineUnit::disconnectUnusedSource(GstElement* tee)
             Source sourceInfo = sourceInfoIterator->second;
 
             if (sourceInfo.m_removeWhenNotUsed) {
-                LOG_MEDIA_MESSAGE("Removing source %p with id=%s", source, sourceId.c_str());
+                LOG(Media, "Removing source %p with id=%s", source, sourceId.c_str());
                 gst_element_set_state(source, GST_STATE_NULL);
                 gst_element_set_state(tee, GST_STATE_NULL);
                 gst_bin_remove(GST_BIN(m_pipeline), source);
@@ -358,7 +360,7 @@ void CentralPipelineUnit::disconnectSinkFromPipelinePadBlocked(GstElement* sink,
             done = true;
             break;
         case GST_ITERATOR_ERROR:
-            LOG_MEDIA_MESSAGE("ERROR, Iterating!");
+            LOG(Media, "ERROR, Iterating!");
             done = true;
             break;
         default:
@@ -381,13 +383,13 @@ void CentralPipelineUnit::disconnectSinkFromPipelinePadBlocked(GstElement* sink,
     if (doRemoveSink) {
         gst_element_set_state(sink, GST_STATE_NULL);
         gst_bin_remove(GST_BIN(m_pipeline), sink);
-        LOG_MEDIA_MESSAGE("Sink removed");
+        LOG(Media, "Sink removed");
         //GstPad* teeSinkPad = gst_element_get_static_pad(tee, "sink");
         //GstPad* sourceSrcPad = gst_pad_get_peer(teeSinkPad);
         //GstElement* source = gst_pad_get_parent_element(sourceSrcPad);
         disconnectUnusedSource(tee);
     } else
-        LOG_MEDIA_MESSAGE("Did not remove the sink");
+        LOG(Media, "Did not remove the sink");
 
 }
 
@@ -397,7 +399,7 @@ void CentralPipelineUnit::disconnectSinkFromTee(GstElement* tee, GstElement* sin
     if (!pad)
         sinkSinkPad = gst_element_get_static_pad(sink, "sink");
 
-    LOG_MEDIA_MESSAGE("disconnecting sink %s from tee", GST_OBJECT_NAME(sink));
+    LOG(Media, "disconnecting sink %s from tee", GST_OBJECT_NAME(sink));
 
     GstPad* queueSourcePad = gst_pad_get_peer(sinkSinkPad);
     GstElement* queue = gst_pad_get_parent_element(queueSourcePad);
@@ -418,7 +420,7 @@ bool CentralPipelineUnit::handleMessage(GstMessage* message)
     switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_ERROR: {
         gst_message_parse_error(message, &error, &debug);
-        LOG_MEDIA_MESSAGE("Media error: %d, %s", error->code, error->message);
+        LOG(Media, "Media error: %d, %s", error->code, error->message);
         //GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "webkit-mediastream.error");
         gst_object_unref(error);
         break;
