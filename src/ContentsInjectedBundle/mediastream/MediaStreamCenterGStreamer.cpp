@@ -188,30 +188,6 @@ MediaStreamCenterGStreamer::MediaStreamCenterGStreamer()
     registerSourceFactories(sources);
 }
 
-//FIXME MediaStreamDescriptor changed in current WebKit..
-/*void MediaStreamCenterGStreamer::didSetMediaStreamTrackEnabled(MediaStreamSource*)
-{
-    LOG_MEDIA_MESSAGE("enabled: %d", source->enabled());
-    source->setReadyState(MediaStreamSource::Live);
-}
-void MediaStreamCenterGStreamer::didStopLocalMediaStream(MediaStreamDescriptor*)
-{
-    LOG_MEDIA_MESSAGE("didStopLocalMediaStream %s", streamDescriptor->id().utf8().data());
-
-    for (unsigned i = 0; i < streamDescriptor->numberOfVideoStreams(); i++) {
-        MediaStreamSource* source = streamDescriptor->videoStreams(i);
-        source->setEnabled(false);
-        source->setReadyState(MediaStreamSource::Ended);
-    }
-
-    for (unsigned i = 0; i < streamDescriptor->numberOfAudioStreams(); i++) {
-        MediaStreamSource* source = streamDescriptor->audioStreams(i);
-        source->setEnabled(false);
-        source->setReadyState(MediaStreamSource::Ended);
-    }
-}
-*/
-
 void MediaStreamCenterGStreamer::registerSourceFactories(const std::vector<MediaStreamSourceGStreamer*>& sources)
 {
     CentralPipelineUnit& cpu = CentralPipelineUnit::instance();

@@ -71,10 +71,6 @@ public:
     MediaStreamSourceGStreamerMap& sourceMap() { return m_sourceMap; }
     Nix::MediaStreamSource* firstSource(Nix::MediaStreamSource::Type);
 
-//  TODO: Check if these methods are still necessary
-//    void didSetMediaStreamTrackEnabled(Nix::MediaStreamSource*);
-//    void didStopLocalMediaStream(Nix::MediaStreamDescriptor*);
-
 private:
     typedef std::map<std::string, GstElementFactory*> ElementFactoryMap;
 
